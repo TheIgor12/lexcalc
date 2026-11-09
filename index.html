@@ -55,7 +55,9 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 @media (max-width:600px){.grid3,.kpis,.fields{grid-template-columns:1fr}.f.s2{grid-column:auto}.logo{font-size:22px}}
 @media print{.top,.acts,.noprint,.bgleao{display:none!important}.soprint{display:block!important}body,html{background:#fff;color:#000}.panel,.kpi{background:#fff;border-color:#999}.kpi b,th{color:#000}.wrap{padding:0}td input{border:0;background:none;color:#000}}
 .olhoW{position:relative;display:block;width:100%}.olhoW input{width:100%;padding-right:44px!important}.olhoB{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:inherit;opacity:.65;padding:6px;line-height:0}.olhoB:hover{opacity:1}
-</style>
+.dtW{position:relative;display:flex;align-items:center;width:100%}.dtW .dtT{width:100%;padding-right:38px!important}.dtW input[type=date]{position:absolute;right:6px;bottom:0;width:28px;height:100%;opacity:0;pointer-events:none;border:0;padding:0}.dtW .dtB{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;padding:5px;line-height:0;cursor:pointer;color:inherit;opacity:.7}.dtW .dtB:hover{opacity:1}.dtErr{border-color:#dc2626!important;outline-color:#dc2626!important}
+.rsW{position:relative;display:flex;align-items:center;width:100%}.rsW>input{width:100%;padding-left:36px!important}.rsW .rsP{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:.92em;opacity:.7;pointer-events:none}
+.dtW .dtB{color:var(--gold2)}</style>
 </head>
 <body>
 <div id="app"></div>
@@ -475,6 +477,28 @@ const OLHO='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="
 function olhoSenha(){document.querySelectorAll('input[type=password]:not([data-olho])').forEach(i=>{i.dataset.olho=1;const w=document.createElement('span');w.className='olhoW';i.parentNode.insertBefore(w,i);w.appendChild(i);const b=document.createElement('button');b.type='button';b.className='olhoB';b.title='Mostrar senha';b.innerHTML=OLHO;
  b.onclick=e=>{e.preventDefault();const ver=i.type==='password';i.type=ver?'text':'password';b.innerHTML=ver?OLHO_X:OLHO;b.title=ver?'Esconder senha':'Mostrar senha';i.focus()};w.appendChild(b)})}
 new MutationObserver(olhoSenha).observe(document.documentElement,{childList:true,subtree:true});
+/* Datas com barras automáticas (dd/mm/aaaa) em qualquer navegador e R$ nos campos de dinheiro */
+const isoBr=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')?v.slice(8,10)+'/'+v.slice(5,7)+'/'+v.slice(0,4):'';
+function dataValida(d,m,a){const x=new Date(a,m-1,d);return a>=1900&&a<=2100&&x.getFullYear()===a&&x.getMonth()===m-1&&x.getDate()===d}
+function mascaraData(){document.querySelectorAll('input[type=date]:not([data-mask])').forEach(o=>{o.dataset.mask=1;
+ const w=document.createElement('span');w.className='dtW';o.parentNode.insertBefore(w,o);
+ const t=document.createElement('input');t.type='text';t.inputMode='numeric';t.autocomplete='off';t.placeholder='dd/mm/aaaa';t.maxLength=10;t.className='dtT';if(o.getAttribute('style'))t.setAttribute('style',o.getAttribute('style'));t.disabled=o.disabled;t.value=isoBr(o.value);
+ if(o.required){t.required=true;o.required=false}if(o.id){const l=document.querySelector(`label[for="${o.id}"]`);if(l){t.id=o.id+'_txt';l.htmlFor=t.id}}
+ const b=document.createElement('button');b.type='button';b.className='dtB';b.title='Abrir calendário';b.tabIndex=-1;b.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+ w.appendChild(t);w.appendChild(o);w.appendChild(b);
+ const avisar=()=>{o.dispatchEvent(new Event('input',{bubbles:true}));o.dispatchEvent(new Event('change',{bubbles:true}))};
+ t.addEventListener('input',e=>{const d=t.value.replace(/\D/g,'').slice(0,8);let f=d;if(d.length>4)f=d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4);else if(d.length>2)f=d.slice(0,2)+'/'+d.slice(2);if(t.value!==f)t.value=f;
+  if(d.length===8){const dd=+d.slice(0,2),mm=+d.slice(2,4),aa=+d.slice(4);if(dataValida(dd,mm,aa)){o.value=d.slice(4)+'-'+d.slice(2,4)+'-'+d.slice(0,2);t.classList.remove('dtErr');t.setCustomValidity('');avisar()}else{t.classList.add('dtErr');t.setCustomValidity('Data inválida')}}
+  else if(!d.length){o.value='';t.classList.remove('dtErr');t.setCustomValidity('');avisar()}else{t.setCustomValidity(t.required||d.length?'Complete a data: dia, mês e ano':'')}});
+ t.addEventListener('blur',()=>{if(t.value&&t.value.length<10)t.classList.add('dtErr')});
+ o.addEventListener('change',()=>{const v=isoBr(o.value);if(v!==t.value){t.value=v;t.classList.remove('dtErr');t.setCustomValidity('')}});
+ b.onclick=e=>{e.preventDefault();try{o.showPicker()}catch(x){o.focus();o.click()}}})}
+const DINHEIRO_CHAVE=/(^|[\s_\-.])(valor|valorpago|preco|precopacote|custo|abertura|total|pago|agvalbase|agexv|lv|pval|adia|ateto|cvc|tpri|tbase|ldvalor)($|[\s_\-.])/i;
+function ehDinheiro(i){if(i.dataset.rs!==undefined)return i.dataset.rs!=='0';if(['checkbox','radio','date','hidden','file','time','email','tel','password'].includes(i.type))return false;
+ const k=[i.name,i.id,...i.classList].filter(Boolean).join(' ');if(/(pct|percent|comiss|qtd|sessoes|dias|horas|duracao|intervalo|minimo|repetir|limite|peso|altura)/i.test(k))return false;
+ if(DINHEIRO_CHAVE.test(k))return true;const l=i.closest('label');const tx=l?(l.querySelector('span')||l).textContent:'';return /R\$|\bvalor\b|\bpreço\b|\bcusto\b/i.test(tx)&&!/%|\bdias?\b|\bminutos?\b|\bsess/i.test(tx)}
+function prefixoReais(){document.querySelectorAll('input:not([data-rsok])').forEach(i=>{i.dataset.rsok=1;if(!ehDinheiro(i))return;const w=document.createElement('span');w.className='rsW';i.parentNode.insertBefore(w,i);const s=document.createElement('span');s.className='rsP';s.textContent='R$';w.appendChild(s);w.appendChild(i)})}
+new MutationObserver(()=>{mascaraData();prefixoReais()}).observe(document.documentElement,{childList:true,subtree:true});
 </script>
 </body>
 </html>
