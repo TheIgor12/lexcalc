@@ -4,6 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const PRECO = 69.9;
+const CHAVE_ADM: string = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || String(Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}"))[0] ?? "");
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const API = Deno.env.get("ASAAS_AMBIENTE") === "sandbox" ? "https://api-sandbox.asaas.com/v3" : "https://api.asaas.com/v3";
 const get = async (c: string) => {
@@ -31,7 +32,7 @@ Deno.serve(async (req) => {
     if (!UUID.test(dono) && p.customer) dono = String((await get(`/customers/${p.customer}`))?.externalReference ?? "");
     if (!UUID.test(dono)) return ok();
 
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, CHAVE_ADM, { auth: { persistSession: false } });
     const { error } = await sb.rpc("lexcalc_liberar_mes", { p_user: dono, p_pagamento: "asaas-" + id, p_valor: p.value, p_meio: p.billingType ?? null });
     if (error) return new Response("erro ao liberar", { status: 500 });
     return ok();

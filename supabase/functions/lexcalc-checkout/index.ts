@@ -3,6 +3,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const PRECO = 69.9;
+const CHAVE_ADM: string = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || String(Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}"))[0] ?? "");
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -26,12 +27,10 @@ Deno.serve(async (req) => {
   const resp = (o: unknown, s = 200) =>
     new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
   try {
-    const auth = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-    });
-    const { data: { user } } = await auth.auth.getUser();
+    const adm = createClient(Deno.env.get("SUPABASE_URL")!, CHAVE_ADM, { auth: { persistSession: false } });
+    const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const { data: { user } } = await adm.auth.getUser(jwt);
     if (!user) return resp({ erro: "Entre na sua conta para assinar." }, 401);
-    const adm = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const corpo = await req.json().catch(() => ({}));
 
     const { data: reg } = await adm.from("lexcalc_asaas").select("*").eq("user_id", user.id).maybeSingle();
