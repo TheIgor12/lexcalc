@@ -233,7 +233,7 @@ function lerForm(){const c=U.calc,d=c.dados;const v=id=>{const e=$(id);return e?
  if($('#tl')){const D=[...document.querySelectorAll('.lD')],V=[...document.querySelectorAll('.lV')],X=[...document.querySelectorAll('.lX')],I=[...document.querySelectorAll('.lI')],J=[...document.querySelectorAll('.lJ')],T=[...document.querySelectorAll('.lT')],B=[...document.querySelectorAll('.lB')];d.lanc=D.map((e,i)=>({data:e.value,valor:V[i].value,desc:X[i].value,indice:I[i]?I[i].value:'',jurosDesde:J[i]?J[i].value:'',tipo:T[i]?T[i].value:'',dobro:B[i]?B[i].checked:false}))}
  if($('#tModo')){const t=d.trib;t.modo=v('#tModo');if($('#tPri'))t.principal=v('#tPri');if($('#tVen'))t.venc=v('#tVen');if($('#tPag'))t.pag=v('#tPag');if($('#tBase')){t.base=v('#tBase');t.ano=v('#tAno');t.cbs=v('#tCbs');t.ibs=v('#tIbs');t.is=v('#tIs')}}}
 async function calcular(){lerForm();const c=U.calc,d=c.dados;const box=$('#res');box.innerHTML='<p class="sub">Calculando e buscando os índices no Banco Central...</p>';
- try{c.resultado=c.tipo==='tributario'?await calcTrib(d):await calcLanc(c.tipo,d);box.innerHTML=resHTML(c.resultado);box.scrollIntoView({behavior:'smooth'})}catch(e){box.innerHTML=`<div class="notice bad">${esc(e.message||e)}</div>`}}
+ try{c.resultado=c.tipo==='tributario'?await calcTrib(d):await calcLanc(c.tipo,d);box.innerHTML=resHTML(c.resultado);box.scrollIntoView({behavior:'smooth'});const ok=await salvar(true);if(!ok)box.insertAdjacentHTML('afterbegin',`<div class="notice noprint">Este cálculo <b>ainda não está salvo</b>. Para encontrá-lo depois em Meus cálculos, informe o autor, o réu e o número do processo (ou marque Distribuído sem número) e clique em Salvar.</div>`)}catch(e){box.innerHTML=`<div class="notice bad">${esc(e.message||e)}</div>`}}
 async function calcLanc(tipo,d){const ate=d.dataCalculo||hoje();JMODO=d.jurosModo==='dia'?'dia':'mes';IPCA_LEI=!!d.ipcaLei;const ateJ=d.jurosAte&&d.jurosAte<ate?d.jurosAte:ate;const liq=tipo==='liquidacao';const L=d.lanc.filter(l=>l.data&&num(l.valor));const A=d.astr||{};const temAstr=liq&&num(A.dia)&&A.ini&&A.fim;
  if(!L.length&&!temAstr)throw new Error('Informe pelo menos um valor com data.');
  const linhas=[];let avisos=new Set();
@@ -423,14 +423,14 @@ async function testarTimbrado(b){const ant=U.calc;U.calc={processo:'0000000-00.0
  try{await planilha('imprimir',b)}finally{U.calc=ant}}
 
 /* ============ Salvar, buscar e abrir ============ */
-async function salvar(){lerForm();const c=U.calc;
- if(!c.autor||!c.reu){toast('Informe o autor e o réu.');return}
- const temNum=!!c.processo;if(!temNum){if(c.id){toast('Informe o número do processo. Depois do primeiro cálculo ele é obrigatório.');$('#cProc').focus();return}if(!c.sem_numero){toast('Informe o número do processo ou marque Distribuído sem número.');return}}
+async function salvar(auto){if(!auto)lerForm();const c=U.calc;
+ if(!c.autor||!c.reu){if(!auto)toast('Informe o autor e o réu.');return false}
+ const temNum=!!c.processo;if(!temNum){if(auto)return false;if(c.id){toast('Informe o número do processo. Depois do primeiro cálculo ele é obrigatório.');$('#cProc').focus();return false}if(!c.sem_numero){toast('Informe o número do processo ou marque Distribuído sem número.');return false}}
  const row={tipo:c.tipo,processo:c.processo||null,autor:c.autor,reu:c.reu,sem_numero:!temNum,dados:c.dados,resultado:c.resultado,atualizado_em:new Date().toISOString()};
  const q=c.id?SB.from('lexcalc_calculos').update(row).eq('id',c.id).select().single():SB.from('lexcalc_calculos').insert(row).select().single();
- const {data,error}=await q;if(error){toast('Não foi possível salvar: '+error.message);return}Object.assign(c,data);toast('Cálculo salvo na nuvem');await carregar();render()}
+ const {data,error}=await q;if(error){toast('Não foi possível salvar: '+error.message);return false}Object.assign(c,data);toast(auto?'Cálculo salvo automaticamente em Meus cálculos':'Cálculo salvo na nuvem');await carregar();if(!auto)render();return true}
 async function carregar(){let q=SB.from('lexcalc_calculos').select('id,tipo,processo,autor,reu,sem_numero,resultado,atualizado_em').order('atualizado_em',{ascending:false}).limit(60);
- const b=U.busca.trim();if(b){const s=b.replace(/[%,()]/g,' ');q=q.or(`autor.ilike.%${s}%,reu.ilike.%${s}%,processo.ilike.%${s}%`)}
+ const b=U.busca.trim();if(b){const P=b.replace(/[%,()*.:"'\\]/g,' ').split(/\s+/).filter(Boolean).slice(0,6);P.forEach(w=>{const d=w.replace(/\D/g,'');const ps=[`autor.ilike.*${w}*`,`reu.ilike.*${w}*`,`processo.ilike.*${w}*`];if(d.length>=4&&d!==w)ps.push(`processo.ilike.*${d}*`);q=q.or(ps.join(','))})}
  const {data,error}=await q;if(error){toast('Não foi possível carregar os cálculos: '+error.message);U.lista=[];return}U.lista=data||[]}
 async function buscar(t){U.busca=String(t||'');await carregar();ir('meus')}
 async function abrir(id){const {data,error}=await SB.from('lexcalc_calculos').select('*').eq('id',id).single();if(error){toast('Não foi possível abrir');return}
