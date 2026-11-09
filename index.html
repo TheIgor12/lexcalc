@@ -166,9 +166,9 @@ function formLanc(c,d){const liq=c.tipo==='liquidacao';const par=!liq&&d.modo===
   <div class="f s2"><label>Juros *</label><select id="cJur">${OPT_JUR}</select></div>
   <div class="f"><label>Juros desde (citação; na Justiça do Trabalho, o ajuizamento). Vazio: data de cada valor</label><input type="date" id="cJD" value="${d.jurosDesde||''}"></div>
   <div class="f"><label>Multa moratória (%)</label><input id="cMul" value="${d.multa||0}"></div>
-  ${selPct('cCla','Cláusula penal (sobre o valor corrigido)',d.clausula,['0','10','20','30'])}
-  ${selPct('cHon','Honorários de sucumbência',d.honorarios,['0','10','15','20'])}
-  ${selPct('cHoc','Honorários contratuais',d.honCont,['0','10','20','30'])}
+  ${selPct('cCla','Cláusula penal (sobre o valor corrigido)',d.clausula,['0','10','20','30','40','50'])}
+  ${selPct('cHon','Honorários de sucumbência',d.honorarios,['0','10','15','20','25','30','35','40','45','50'])}
+  ${selPct('cHoc','Honorários contratuais',d.honCont,['0','10','15','20','25','30','35','40','45','50'])}
   <div class="f s2" style="justify-content:flex-end"><label class="chk"><input type="checkbox" id="cHcl" ${d.honSobreClausula?'checked':''}> Honorários também sobre a cláusula penal</label></div>
   <div class="f s2" style="justify-content:flex-end"><label class="chk"><input type="checkbox" id="cDef" ${d.semDeflacao?'checked':''}> Desconsiderar os meses de deflação (índice negativo)</label></div>
   ${`<div class="f s2" style="justify-content:flex-end"><label class="chk"><input type="checkbox" id="c523" ${d.art523?'checked':''}> Cumprimento de sentença sem pagamento voluntário: multa de 10% e honorários de 10% (art. 523, §1º, do CPC)</label></div>`}
