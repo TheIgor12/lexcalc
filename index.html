@@ -54,6 +54,7 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 @media (max-width:900px){.grid3,.kpis{grid-template-columns:1fr 1fr}.fields{grid-template-columns:1fr 1fr}.login{grid-template-columns:1fr}.login .art{display:none}.bgleao{display:none}.nav{order:3;width:100%}.top{flex-wrap:wrap}}
 @media (max-width:600px){.grid3,.kpis,.fields{grid-template-columns:1fr}.f.s2{grid-column:auto}.logo{font-size:22px}}
 @media print{.top,.acts,.noprint,.bgleao{display:none!important}body,html{background:#fff;color:#000}.panel,.kpi{background:#fff;border-color:#999}.kpi b,th{color:#000}.wrap{padding:0}td input{border:0;background:none;color:#000}}
+.olhoW{position:relative;display:block;width:100%}.olhoW input{width:100%;padding-right:44px!important}.olhoB{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:inherit;opacity:.65;padding:6px;line-height:0}.olhoB:hover{opacity:1}
 </style>
 </head>
 <body>
@@ -151,6 +152,8 @@ function vCalc(){const c=U.calc,d=c.dados;const T={juridico:'Novo cálculo jurí
   ${c.tipo==='tributario'?formTrib(d):formLanc(c,d)}
   <div class="acts"><button class="btn2" onclick="salvar()">💾 Salvar</button><button class="btn" onclick="calcular()">Calcular</button></div></div>
   <div id="res" class="res">${c.resultado?resHTML(c.resultado):''}</div>`}
+function selPct(id,rot,val,ops){val=String(val??'0').replace('.',',');const outro=!ops.includes(val);return `<div class="f"><label>${rot}</label><div style="display:flex;gap:6px"><select id="${id}" onchange="const o=document.getElementById('${id}O');o.style.display=this.value==='o'?'block':'none';if(this.value==='o')o.focus()" style="flex:1">${ops.map(o=>`<option value="${o}" ${!outro&&val===o?'selected':''}>${o==='0'?'Sem':o+'%'}</option>`).join('')}<option value="o" ${outro?'selected':''}>Outro</option></select><input id="${id}O" placeholder="%" value="${outro?esc(val):''}" style="width:80px;display:${outro?'block':'none'}"></div></div>`}
+function pctLer(id){const s=document.getElementById(id);if(!s)return 0;return s.value==='o'?(document.getElementById(id+'O').value||'0'):s.value}
 function formLanc(c,d){const liq=c.tipo==='liquidacao';const par=!liq&&d.modo==='parcelas';const pc=d.parc||{};
  return `${!liq?`<h3>Tipo de cálculo</h3><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="${d.modo!=='parcelas'?'btn':'btn2'}" onclick="lerForm();U.calc.dados.modo='individual';U.calc.dados.lanc=U.calc.dados.lanc.slice(0,Math.max(1,U.calc.dados.lanc.length));render()">Cálculo individual</button><button class="${par?'btn':'btn2'}" onclick="lerForm();U.calc.dados.modo='parcelas';render()">Cálculo por parcelas</button></div>
  <p class="sub" style="margin-top:8px">${par?'Gere as parcelas automaticamente (aluguéis, prestações, pensão) ou digite cada uma na tabela. Cada parcela é corrigida a partir do próprio vencimento.':'Um ou mais valores, cada um com a sua data. Use valor negativo para descontar pagamentos.'}</p>
@@ -162,10 +165,13 @@ function formLanc(c,d){const liq=c.tipo==='liquidacao';const par=!liq&&d.modo===
   <div class="f s2"><label>Tabela do tribunal ou índice de correção *</label><select id="cInd" onchange="const n=$('#cNota');if(n)n.textContent=TAB[this.value]?TAB[this.value].nota:''">${OPT_IND}</select><small id="cNota" style="color:var(--mut)">${TAB[d.indice]?esc(TAB[d.indice].nota):''}</small></div>
   <div class="f s2"><label>Juros *</label><select id="cJur">${OPT_JUR}</select></div>
   <div class="f"><label>Juros desde (citação; na Justiça do Trabalho, o ajuizamento). Vazio: data de cada valor</label><input type="date" id="cJD" value="${d.jurosDesde||''}"></div>
-  <div class="f"><label>Multa (%)</label><input id="cMul" value="${d.multa||0}"></div>
-  <div class="f"><label>Honorários (%)</label><input id="cHon" value="${d.honorarios||0}"></div>
+  <div class="f"><label>Multa moratória (%)</label><input id="cMul" value="${d.multa||0}"></div>
+  ${selPct('cCla','Cláusula penal (sobre o valor corrigido)',d.clausula,['0','10','20','30'])}
+  ${selPct('cHon','Honorários de sucumbência',d.honorarios,['0','10','15','20'])}
+  ${selPct('cHoc','Honorários contratuais',d.honCont,['0','10','20','30'])}
+  <div class="f s2" style="justify-content:flex-end"><label class="chk"><input type="checkbox" id="cHcl" ${d.honSobreClausula?'checked':''}> Honorários também sobre a cláusula penal</label></div>
   <div class="f s2" style="justify-content:flex-end"><label class="chk"><input type="checkbox" id="cDef" ${d.semDeflacao?'checked':''}> Desconsiderar os meses de deflação (índice negativo)</label></div>
-  ${liq?`<div class="f s2" style="justify-content:flex-end"><label class="chk"><input type="checkbox" id="c523" ${d.art523?'checked':''}> Cumprimento de sentença sem pagamento voluntário: multa de 10% e honorários de 10% (art. 523, §1º, do CPC)</label></div>`:''}
+  ${`<div class="f s2" style="justify-content:flex-end"><label class="chk"><input type="checkbox" id="c523" ${d.art523?'checked':''}> Cumprimento de sentença sem pagamento voluntário: multa de 10% e honorários de 10% (art. 523, §1º, do CPC)</label></div>`}
  </div>`}
 function formTrib(d){const t=d.trib;
  return `<h3>Modalidade</h3><div class="fields"><div class="f s2"><label>O que calcular</label><select id="tModo" onchange="lerForm();render()"><option value="debito" ${t.modo==='debito'?'selected':''}>Débito federal em atraso (regra do Sicalc)</option><option value="restituicao" ${t.modo==='restituicao'?'selected':''}>Restituição ou compensação pela Selic</option><option value="ibscbs" ${t.modo==='ibscbs'?'selected':''}>Simulação de IBS, CBS e Imposto Seletivo</option></select></div></div>
@@ -176,7 +182,7 @@ function gerarParcelas(){lerForm();const p=U.calc.dados.parc;const val=num(p.val
 function posCalc(){const d=U.calc.dados;if($('#cInd'))$('#cInd').value=d.indice||'t_tjsc';if($('#cJur'))$('#cJur').value=d.juros||'auto';document.querySelectorAll('.lI').forEach((s,i)=>s.value=(d.lanc[i]||{}).indice||'')}
 function lerForm(){const c=U.calc,d=c.dados;const v=id=>{const e=$(id);return e?e.value:undefined};
  if($('#cProc'))c.processo=v('#cProc').trim();c.autor=(v('#cAutor')??c.autor).trim();c.reu=(v('#cReu')??c.reu).trim();if($('#cData'))d.dataCalculo=v('#cData')||hoje();
- if($('#cInd'))d.indice=v('#cInd');if($('#cJur'))d.juros=v('#cJur');if($('#cJD'))d.jurosDesde=v('#cJD');if($('#cMul'))d.multa=v('#cMul');if($('#cDef'))d.semDeflacao=$('#cDef').checked;if($('#pVal')){d.parc={valor:v('#pVal'),qtd:v('#pQtd'),primeiro:v('#pIni')}}if($('#cHon'))d.honorarios=v('#cHon');if($('#c523'))d.art523=$('#c523').checked;
+ if($('#cInd'))d.indice=v('#cInd');if($('#cJur'))d.juros=v('#cJur');if($('#cJD'))d.jurosDesde=v('#cJD');if($('#cMul'))d.multa=v('#cMul');if($('#cDef'))d.semDeflacao=$('#cDef').checked;if($('#pVal')){d.parc={valor:v('#pVal'),qtd:v('#pQtd'),primeiro:v('#pIni')}}if($('#cHon'))d.honorarios=pctLer('cHon');if($('#cCla'))d.clausula=pctLer('cCla');if($('#cHoc'))d.honCont=pctLer('cHoc');if($('#cHcl'))d.honSobreClausula=$('#cHcl').checked;if($('#c523'))d.art523=$('#c523').checked;
  if($('#tl')){const D=[...document.querySelectorAll('.lD')],V=[...document.querySelectorAll('.lV')],X=[...document.querySelectorAll('.lX')],I=[...document.querySelectorAll('.lI')],J=[...document.querySelectorAll('.lJ')];d.lanc=D.map((e,i)=>({data:e.value,valor:V[i].value,desc:X[i].value,indice:I[i]?I[i].value:'',jurosDesde:J[i]?J[i].value:''}))}
  if($('#tModo')){const t=d.trib;t.modo=v('#tModo');if($('#tPri'))t.principal=v('#tPri');if($('#tVen'))t.venc=v('#tVen');if($('#tPag'))t.pag=v('#tPag');if($('#tBase')){t.base=v('#tBase');t.ano=v('#tAno');t.cbs=v('#tCbs');t.ibs=v('#tIbs');t.is=v('#tIs')}}}
 async function calcular(){lerForm();const c=U.calc,d=c.dados;const box=$('#res');box.innerHTML='<p class="sub">Calculando e buscando os índices no Banco Central...</p>';
@@ -186,10 +192,11 @@ async function calcLanc(tipo,d){const ate=d.dataCalculo||hoje();const L=d.lanc.f
  for(const l of L){const k=l.indice||d.indice;const cr=await correcao(k,l.data,ate,{ajuiz:d.jurosDesde,semDeflacao:d.semDeflacao});if(cr.antes)avisos.add(`${nomeCrit(k)}: a tabela começa depois da data de ${br(l.data)}; os meses anteriores não foram corrigidos.`);if(cr.falta)avisos.add(`${nomeCrit(k)}: índices divulgados até ${mesBr(cr.ult||l.data.slice(0,7))}; ${cr.falta} ${cr.falta===1?'mês ainda sem índice':'meses ainda sem índice'}.`);
   const v=num(l.valor),vc=v*cr.f;const jd=l.jurosDesde||d.jurosDesde||l.data;const j=await juros(d.juros,jd>l.data?jd:l.data,ate,cr.selic);const vj=vc*j.p/100;
   linhas.push({data:l.data,desc:l.desc,valor:v,fator:cr.f,corrigido:vc,juros:vj,jurosTxt:j.txt,total:vc+vj,indice:nomeCrit(k)})}
- const sub=linhas.reduce((s,x)=>s+x.total,0);const multa=sub*num(d.multa)/100;let base=sub+multa;const hon=base*num(d.honorarios)/100;
- const m523=tipo==='liquidacao'&&d.art523?base*0.10:0,h523=tipo==='liquidacao'&&d.art523?base*0.10:0;
- const total=base+hon+m523+h523;
- return {tipo,ate,linhas,sub,multa,hon,m523,h523,total,principal:linhas.reduce((s,x)=>s+x.valor,0),corrigido:linhas.reduce((s,x)=>s+x.corrigido,0),juros:linhas.reduce((s,x)=>s+x.juros,0),avisos:[...avisos],criterios:`Correção: ${nomeCrit(d.indice)}${TAB[d.indice]?' ('+TAB[d.indice].nota+')':''}${d.semDeflacao?' Meses de deflação desconsiderados.':''} Juros: ${OPT_JUR.match(new RegExp('value="'+d.juros+'">([^<]*)'))[1]}${d.jurosDesde?' desde '+br(d.jurosDesde):' desde a data de cada valor'}. Multa: ${String(d.multa||0)}%. Honorários: ${String(d.honorarios||0)}%.`}}
+ const sub=linhas.reduce((s,x)=>s+x.total,0);const corr=linhas.reduce((s,x)=>s+x.corrigido,0);const multa=sub*num(d.multa)/100;const clausula=corr*num(d.clausula)/100;
+ const baseHon=sub+multa+(d.honSobreClausula?clausula:0);const hon=baseHon*num(d.honorarios)/100,honc=baseHon*num(d.honCont)/100;
+ const base523=sub+multa+clausula+hon;const m523=d.art523?base523*0.10:0,h523=d.art523?base523*0.10:0;
+ const total=sub+multa+clausula+hon+honc+m523+h523;
+ return {tipo,ate,linhas,sub,multa,clausula,hon,honc,m523,h523,total,principal:linhas.reduce((s,x)=>s+x.valor,0),corrigido:linhas.reduce((s,x)=>s+x.corrigido,0),juros:linhas.reduce((s,x)=>s+x.juros,0),avisos:[...avisos],criterios:`Correção: ${nomeCrit(d.indice)}${TAB[d.indice]?' ('+TAB[d.indice].nota+')':''}${d.semDeflacao?' Meses de deflação desconsiderados.':''} Juros: ${OPT_JUR.match(new RegExp('value="'+d.juros+'">([^<]*)'))[1]}${d.jurosDesde?' desde '+br(d.jurosDesde):' desde a data de cada valor'}. Multa moratória: ${String(d.multa||0)}%. Cláusula penal: ${String(d.clausula||0)}% sobre o valor corrigido. Honorários de sucumbência: ${String(d.honorarios||0)}%. Honorários contratuais: ${String(d.honCont||0)}%${d.honSobreClausula?', também sobre a cláusula penal':''}.${d.art523?' Multa e honorários de 10% do art. 523, §1º, do CPC.':''}`}}
 async function calcTrib(d){const t=d.trib;
  if(t.modo==='ibscbs'){const b=num(t.base);if(!b)throw new Error('Informe o valor da operação.');const cbs=b*num(t.cbs)/100,ibs=b*num(t.ibs)/100,is=b*num(t.is)/100;
   return {tipo:'ibscbs',ate:hoje(),base:b,cbs,ibs,is,total:cbs+ibs+is,ano:t.ano,aliq:[t.cbs,t.ibs,t.is]}}
@@ -209,7 +216,7 @@ function resHTML(r){if(!r)return '';
  ${r.avisos.length?`<div class="notice">${r.avisos.map(esc).join('<br>')}</div>`:''}
  <div style="overflow:auto"><table class="memo"><thead><tr><th>Data</th><th>Descrição</th><th>Índice</th><th class="num">Valor</th><th class="num">Fator</th><th class="num">Corrigido</th><th class="num">Juros</th><th class="num">Total</th></tr></thead><tbody>
  ${r.linhas.map(x=>`<tr><td>${br(x.data)}</td><td>${esc(x.desc||'')}</td><td>${esc(x.indice)}</td><td class="num">${R(x.valor)}</td><td class="num">${x.fator.toFixed(6).replace('.',',')}</td><td class="num">${R(x.corrigido)}</td><td class="num" title="${esc(x.jurosTxt)}">${R(x.juros)}</td><td class="num"><b>${R(x.total)}</b></td></tr>`).join('')}
- <tr><td colspan="7"><b>Subtotal</b></td><td class="num"><b>${R(r.sub)}</b></td></tr>${r.multa?`<tr><td colspan="7">Multa</td><td class="num">${R(r.multa)}</td></tr>`:''}${r.hon?`<tr><td colspan="7">Honorários</td><td class="num">${R(r.hon)}</td></tr>`:''}${r.m523?`<tr><td colspan="7">Multa de 10% (art. 523, §1º, do CPC)</td><td class="num">${R(r.m523)}</td></tr><tr><td colspan="7">Honorários de 10% (art. 523, §1º, do CPC)</td><td class="num">${R(r.h523)}</td></tr>`:''}
+ <tr><td colspan="7"><b>Subtotal</b></td><td class="num"><b>${R(r.sub)}</b></td></tr>${r.multa?`<tr><td colspan="7">Multa moratória</td><td class="num">${R(r.multa)}</td></tr>`:''}${r.clausula?`<tr><td colspan="7">Cláusula penal</td><td class="num">${R(r.clausula)}</td></tr>`:''}${r.hon?`<tr><td colspan="7">Honorários de sucumbência</td><td class="num">${R(r.hon)}</td></tr>`:''}${r.honc?`<tr><td colspan="7">Honorários contratuais</td><td class="num">${R(r.honc)}</td></tr>`:''}${r.m523?`<tr><td colspan="7">Multa de 10% (art. 523, §1º, do CPC)</td><td class="num">${R(r.m523)}</td></tr><tr><td colspan="7">Honorários de 10% (art. 523, §1º, do CPC)</td><td class="num">${R(r.h523)}</td></tr>`:''}
  <tr><td colspan="7"><b>Total</b></td><td class="num"><b>${R(r.total)}</b></td></tr></tbody></table></div><p class="sub" style="margin-top:10px">${esc(r.criterios)}</p>
  <div class="acts noprint"><button class="btn2" onclick="window.print()">Imprimir relatório</button></div></div>`}
 
@@ -257,6 +264,12 @@ async function confirmar(){const token=$('#lCod').value.trim();const {error}=awa
 async function sair(){await SB.auth.signOut()}
 SB.auth.onAuthStateChange(async(ev,sess)=>{const u=sess?sess.user:null;const mudou=(u&&u.id)!==(U.user&&U.user.id);U.user=u;if(u&&mudou){await checarAssinatura();await carregar()}if(mudou||ev==='SIGNED_OUT')render()});
 (async()=>{const {data}=await SB.auth.getSession();U.user=data.session?data.session.user:null;if(U.user){await checarAssinatura();await carregar()}render()})();
+
+/* Olhinho para mostrar ou esconder a senha */
+const OLHO='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',OLHO_X='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-2.4 3.4M6.6 6.6A17.5 17.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></svg>';
+function olhoSenha(){document.querySelectorAll('input[type=password]:not([data-olho])').forEach(i=>{i.dataset.olho=1;const w=document.createElement('span');w.className='olhoW';i.parentNode.insertBefore(w,i);w.appendChild(i);const b=document.createElement('button');b.type='button';b.className='olhoB';b.title='Mostrar senha';b.innerHTML=OLHO;
+ b.onclick=e=>{e.preventDefault();const ver=i.type==='password';i.type=ver?'text':'password';b.innerHTML=ver?OLHO_X:OLHO;b.title=ver?'Esconder senha':'Mostrar senha';i.focus()};w.appendChild(b)})}
+new MutationObserver(olhoSenha).observe(document.documentElement,{childList:true,subtree:true});
 </script>
 </body>
 </html>
