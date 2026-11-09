@@ -22,3 +22,14 @@ create policy lexcalc_ler on public.lexcalc_calculos for select to authenticated
 create policy lexcalc_criar on public.lexcalc_calculos for insert to authenticated with check (user_id = auth.uid());
 create policy lexcalc_alterar on public.lexcalc_calculos for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy lexcalc_excluir on public.lexcalc_calculos for delete to authenticated using (user_id = auth.uid());
+
+-- Assinantes do Lex Calc: preencha pago_ate quando o pagamento entrar
+create table if not exists public.lexcalc_assinantes (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  pago_ate date,
+  obs text
+);
+alter table public.lexcalc_assinantes enable row level security;
+drop policy if exists lexcalc_assinante_ler on public.lexcalc_assinantes;
+create policy lexcalc_assinante_ler on public.lexcalc_assinantes for select to authenticated using (user_id = auth.uid());

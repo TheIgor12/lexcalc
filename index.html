@@ -94,11 +94,11 @@ const OPT_IND=`<option value="nenhum">Sem correção</option>${Object.entries(IN
 const OPT_JUR=`<option value="nenhum">Sem juros</option><option value="1">1% ao mês (simples)</option><option value="05">0,5% ao mês (simples)</option><option value="selic">Selic acumulada</option><option value="legal">Taxa legal: Selic menos IPCA (Lei 14.905/2024)</option>`;
 
 /* ============ Tela ============ */
-function topo(){const it=[['inicio','Início'],['meus','Meus cálculos'],['ajuda','Ajuda']];
+function topo(){const it=[['inicio','Início'],['meus','Meus cálculos'],['assinar','Assinatura'],['ajuda','Ajuda']];
  return `<div class="top"><div class="logo" onclick="ir('inicio')"><img src="assets/icone.png" alt=""><span>Lex <b>Calc</b></span></div><div class="nav">${it.map(([k,t])=>`<button class="${U.view===k?'on':''}" onclick="ir('${k}')">${t}</button>`).join('')}</div><div class="usr">${esc(U.user?U.user.email:'')}<button class="btn3" onclick="sair()">Sair</button></div></div>`}
 function ir(v,extra){U.view=v;if(extra!==undefined)U.calc=extra;render();window.scrollTo(0,0)}
 function render(){const a=$('#app');if(!U.user){a.innerHTML=telaLogin();return}
- const V={inicio:vInicio,meus:vMeus,ajuda:vAjuda,calc:vCalc}[U.view]||vInicio;a.innerHTML=topo()+`<div class="bgleao"></div><div class="wrap">${V()}</div>`;if(U.view==='calc')posCalc()}
+ let V={inicio:vInicio,meus:vMeus,ajuda:vAjuda,calc:vCalc,assinar:vAssinar}[U.view]||vInicio;if(!ASS.ok)V=vAssinar;a.innerHTML=topo()+`<div class="bgleao"></div><div class="wrap">${U.view!=='assinar'&&ASS.ok?faixaAssinatura():''}${V()}</div>`;if(U.view==='calc')posCalc()}
 function vInicio(){return `<h1>O que você deseja calcular?</h1><p class="sub">Selecione uma modalidade para começar.</p>
  <div class="grid3">${[['juridico','⚖','Cálculo jurídico','Atualização de valores, juros, multas e honorários.'],['liquidacao','🔨','Liquidação de sentença','Verbas da decisão, cumprimento de sentença e art. 523 do CPC.'],['tributario','％','Cálculo tributário','Débitos e restituições pela Selic e simulação de IBS e CBS.']].map(([k,s,t,d])=>`<div class="choice"><div class="sym">${s}</div><h2>${t}</h2><p>${d}</p><button class="btn" onclick="novo('${k}')">Iniciar cálculo ›</button></div>`).join('')}</div>
  <div class="panel"><h2>Buscar cálculo salvo</h2><div style="display:flex;gap:10px;flex-wrap:wrap"><input id="qb" placeholder="Nome do autor, do réu ou número do processo" value="${esc(U.busca)}" style="flex:1;min-width:220px;background:#111e27;border:1px solid #6e6a5e;border-radius:7px;padding:11px;color:#fff" onkeydown="if(event.key==='Enter')buscar(this.value)"><button class="btn" onclick="buscar($('#qb').value)">Buscar</button></div></div>
@@ -185,6 +185,19 @@ function resHTML(r){if(!r)return '';
  <tr><td colspan="7"><b>Total</b></td><td class="num"><b>${R(r.total)}</b></td></tr></tbody></table></div><p class="sub" style="margin-top:10px">${esc(r.criterios)}</p>
  <div class="acts noprint"><button class="btn2" onclick="window.print()">Imprimir relatório</button></div></div>`}
 
+
+/* ============ Teste grátis e assinatura ============ */
+const ASS={cfg:{preco:'R$ 69,90 por mês',link_pagamento:'',whatsapp:'5547984432859',dias_teste:14},pagoAte:null,ok:true,dias:14};
+async function checarAssinatura(){try{const r=await fetch('assinatura.json?t='+Date.now());if(r.ok)Object.assign(ASS.cfg,await r.json())}catch(e){}
+ try{const {data}=await SB.from('lexcalc_assinantes').select('pago_ate').eq('user_id',U.user.id).maybeSingle();ASS.pagoAte=data&&data.pago_ate}catch(e){}
+ const criado=new Date(U.user.created_at||Date.now());ASS.dias=Math.ceil((+ASS.cfg.dias_teste||14)-(Date.now()-criado)/864e5);
+ ASS.ok=(ASS.pagoAte&&ASS.pagoAte>=hoje())||ASS.dias>0}
+function faixaAssinatura(){if(ASS.pagoAte&&ASS.pagoAte>=hoje())return '';return `<div class="notice" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">Teste grátis: ${ASS.dias===1?'falta 1 dia':'faltam '+ASS.dias+' dias'}. Depois, ${esc(ASS.cfg.preco)}.<button class="btn" style="margin-left:auto;padding:8px 16px" onclick="ir('assinar')">Assinar agora</button></div>`}
+function vAssinar(){const wa='https://wa.me/'+ASS.cfg.whatsapp+'?text='+encodeURIComponent('Olá! Quero assinar o Lex Calc. Meu e-mail de acesso é '+U.user.email);
+ return `<h1>Assine o Lex Calc</h1><p class="sub">${ASS.ok?'Garanta o acesso depois do teste grátis.':'O seu teste grátis terminou. Os seus cálculos continuam salvos e voltam a aparecer assim que a assinatura for confirmada.'}</p>
+ <div class="panel" style="max-width:620px"><div style="font:700 40px Georgia,serif;color:var(--gold2)">${esc(ASS.cfg.preco)}</div><p>Plano único: cálculo jurídico, liquidação de sentença e cálculo tributário, com cálculos ilimitados salvos na nuvem.</p>
+ <div class="acts" style="justify-content:flex-start">${ASS.cfg.link_pagamento?`<a class="btn" href="${esc(ASS.cfg.link_pagamento)}" target="_blank" rel="noopener" style="text-decoration:none">Pagar com Pix ou cartão</a>`:''}<a class="btn2" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none">Falar no WhatsApp</a></div>
+ <p class="sub" style="margin-top:14px">Depois de pagar, envie o comprovante pelo WhatsApp informando o e-mail ${esc(U.user.email)}. A liberação é feita no mesmo dia.</p></div>`}
 /* ============ Salvar, buscar e abrir ============ */
 async function salvar(){lerForm();const c=U.calc;
  if(!c.autor||!c.reu){toast('Informe o autor e o réu.');return}
@@ -214,8 +227,8 @@ async function recuperar(){const email=$('#lEm').value.trim();U.lemail=email;con
 async function confirmar(){const token=$('#lCod').value.trim();const {error}=await SB.auth.verifyOtp({email:U.lemail,token,type:U.lrec?'recovery':'signup'});if(error){toast('Código inválido ou vencido.');return}
  if(U.lrec){const {error:e2}=await SB.auth.updateUser({password:$('#lSen').value});if(e2){toast(e2.message);return}toast('Senha alterada')}U.lmodo='entrar';U.lrec=0}
 async function sair(){await SB.auth.signOut()}
-SB.auth.onAuthStateChange(async(ev,sess)=>{const u=sess?sess.user:null;const mudou=(u&&u.id)!==(U.user&&U.user.id);U.user=u;if(u&&mudou){await carregar()}if(mudou||ev==='SIGNED_OUT')render()});
-(async()=>{const {data}=await SB.auth.getSession();U.user=data.session?data.session.user:null;if(U.user)await carregar();render()})();
+SB.auth.onAuthStateChange(async(ev,sess)=>{const u=sess?sess.user:null;const mudou=(u&&u.id)!==(U.user&&U.user.id);U.user=u;if(u&&mudou){await checarAssinatura();await carregar()}if(mudou||ev==='SIGNED_OUT')render()});
+(async()=>{const {data}=await SB.auth.getSession();U.user=data.session?data.session.user:null;if(U.user){await checarAssinatura();await carregar()}render()})();
 </script>
 </body>
 </html>
