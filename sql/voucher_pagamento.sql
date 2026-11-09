@@ -83,3 +83,21 @@ begin
 end $$;
 revoke all on function public.lexcalc_liberar(uuid, text, numeric, text, int) from public, anon, authenticated;
 grant execute on function public.lexcalc_liberar(uuid, text, numeric, text, int) to service_role;
+
+-- 3. Papel timbrado de cada escritório (pasta própria de cada usuário, privada)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('lexcalc', 'lexcalc', false, 8388608, array['application/pdf','image/png','image/jpeg'])
+on conflict (id) do nothing;
+drop policy if exists lexcalc_arq_ler on storage.objects;
+drop policy if exists lexcalc_arq_criar on storage.objects;
+drop policy if exists lexcalc_arq_alterar on storage.objects;
+drop policy if exists lexcalc_arq_excluir on storage.objects;
+create policy lexcalc_arq_ler on storage.objects for select to authenticated
+  using (bucket_id = 'lexcalc' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy lexcalc_arq_criar on storage.objects for insert to authenticated
+  with check (bucket_id = 'lexcalc' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy lexcalc_arq_alterar on storage.objects for update to authenticated
+  using (bucket_id = 'lexcalc' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'lexcalc' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy lexcalc_arq_excluir on storage.objects for delete to authenticated
+  using (bucket_id = 'lexcalc' and (storage.foldername(name))[1] = auth.uid()::text);

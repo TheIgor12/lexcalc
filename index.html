@@ -234,11 +234,11 @@ async function calcTrib(d){const t=d.trib;
  const sub=p+j+multa;const hon=sub*num(d.honorarios)/100;
  return {tipo:t.modo,ate:t.pag,p,jp,j,multa,dd,sub,hon,total:sub+hon,meses:n,det,venc:t.venc,pag:t.pag}}
 function resHTML(r){if(!r)return '';
- if(r.tipo==='ibscbs')return `<div class="panel"><h2>Resultado da simulação</h2><div class="kpis"><div class="kpi"><small>Valor da operação</small><b>${R(r.base)}</b></div><div class="kpi"><small>CBS (${r.aliq[0]}%)</small><b>${R(r.cbs)}</b></div><div class="kpi"><small>IBS (${r.aliq[1]}%)</small><b>${R(r.ibs)}</b></div><div class="kpi"><small>Total de tributos</small><b>${R(r.total)}</b></div></div>${num(r.aliq[2])?`<p>Imposto Seletivo (${r.aliq[2]}%): ${R(r.is)}</p>`:''}<div class="acts noprint"><button class="btn2" onclick="window.print()">Imprimir</button></div></div>`;
+ if(r.tipo==='ibscbs')return `<div class="panel"><h2>Resultado da simulação</h2><div class="kpis"><div class="kpi"><small>Valor da operação</small><b>${R(r.base)}</b></div><div class="kpi"><small>CBS (${r.aliq[0]}%)</small><b>${R(r.cbs)}</b></div><div class="kpi"><small>IBS (${r.aliq[1]}%)</small><b>${R(r.ibs)}</b></div><div class="kpi"><small>Total de tributos</small><b>${R(r.total)}</b></div></div>${num(r.aliq[2])?`<p>Imposto Seletivo (${r.aliq[2]}%): ${R(r.is)}</p>`:''}${BOT_PLAN}</div>`;
  if(r.tipo==='debito'||r.tipo==='restituicao')return `<div class="panel"><h2>${r.tipo==='debito'?'Débito federal atualizado':'Valor a restituir atualizado'}</h2><div class="kpis"><div class="kpi"><small>${r.tipo==='debito'?'Principal':'Valor pago'}</small><b>${R(r.p)}</b></div><div class="kpi"><small>Juros Selic (${P(r.jp)})</small><b>${R(r.j)}</b></div><div class="kpi"><small>${r.tipo==='debito'?'Multa de mora ('+Math.min(20,r.dd*0.33).toFixed(2).replace('.',',')+'%)':'Multa'}</small><b>${R(r.multa)}</b></div><div class="kpi"><small>Total em ${br(r.ate)}</small><b>${R(r.total)}</b></div></div>
   <p class="sub">${r.tipo==='debito'?`Vencimento em ${br(r.venc)} e pagamento em ${br(r.pag)}: ${r.dd} dias de atraso. `:''}Selic de ${r.meses} meses (do mês seguinte ao ${r.tipo==='debito'?'vencimento':'pagamento'} até o mês anterior ao ${r.tipo==='debito'?'pagamento':'cálculo'}) mais 1% do último mês.${r.hon?' Honorários: '+R(r.hon)+'.':''}</p>
   <details style="margin-top:10px"><summary>Taxas Selic usadas</summary><table class="memo"><tr><th>Mês</th><th class="num">Selic</th></tr>${r.det.map(([m,v])=>`<tr><td>${mesBr(m)}</td><td class="num">${String(v).replace('.',',')}%</td></tr>`).join('')}</table></details>
-  <div class="acts noprint"><button class="btn2" onclick="window.print()">Imprimir relatório</button></div></div>`;
+  ${BOT_PLAN}</div>`;
  return `<div class="panel">${cabRel()}<h2>Resultado em ${br(r.ate)}</h2><div class="kpis"><div class="kpi"><small>Valor original</small><b>${R(r.principal)}</b></div><div class="kpi"><small>Corrigido</small><b>${R(r.corrigido)}</b></div><div class="kpi"><small>Juros</small><b>${R(r.juros)}</b></div><div class="kpi"><small>Total devido</small><b>${R(r.total)}</b></div></div>
  ${r.avisos.length?`<div class="notice">${r.avisos.map(esc).join('<br>')}</div>`:''}
  <div style="overflow:auto"><table class="memo"><thead><tr><th>Data</th><th>Descrição</th><th>Índice</th><th class="num">Valor</th><th class="num">Fator</th><th class="num">Corrigido</th><th class="num">Juros</th><th class="num">Total</th></tr></thead><tbody>
@@ -247,7 +247,7 @@ function resHTML(r){if(!r)return '';
  <tr><td colspan="7"><b>Total</b></td><td class="num"><b>${R(r.total)}</b></td></tr></tbody></table></div>
  <details open style="margin-top:12px"><summary>Memória dos juros de cada verba</summary><table class="memo">${r.linhas.map(x=>`<tr><td>${br(x.data)}</td><td>${esc(x.desc||'')}</td><td>${esc(x.jurosTxt)}</td></tr>`).join('')}</table></details>
  <p class="sub" style="margin-top:10px">${esc(r.criterios)}</p>${assRel()}
- <div class="acts noprint"><button class="btn2" onclick="window.print()">Imprimir relatório</button></div></div>`}
+ ${BOT_PLAN}</div>`}
 
 
 /* ============ Teste grátis e assinatura ============ */
@@ -278,18 +278,102 @@ function vConfig(){const p=pref();const u=U.user;
  <div class="panel"><h2 style="margin-top:0">Conta</h2><p>E-mail: <b>${esc(u.email)}</b><br><span class="sub">Conta criada em ${new Date(u.created_at).toLocaleDateString('pt-BR')}</span></p>
   <h3>Trocar a senha</h3><div class="f" style="margin-bottom:10px"><label>Nova senha</label><input id="sN1" type="password" autocomplete="new-password"></div><div class="f"><label>Repita a nova senha</label><input id="sN2" type="password" autocomplete="new-password"></div><div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="trocarSenha()">Trocar senha</button><button class="btn3" onclick="sair()">Sair da conta</button></div></div>
  </div><div>
- <div class="panel"><h2 style="margin-top:0">Dados do relatório</h2><p class="sub">Aparecem no cabeçalho e na assinatura do relatório impresso ou salvo em PDF.</p><div class="f" style="margin:12px 0 10px"><label>Nome do escritório</label><input id="pEsc" value="${esc(p.escritorio||'')}"></div><div class="f" style="margin-bottom:10px"><label>Advogado responsável</label><input id="pAdv" value="${esc(p.advogado||'')}"></div><div class="f" style="margin-bottom:10px"><label>OAB (número e estado)</label><input id="pOab" value="${esc(p.oab||'')}" placeholder="Ex.: 12.345/SC"></div><div class="f"><label>Telefone ou e-mail para contato</label><input id="pCon" value="${esc(p.contato||'')}"></div></div>
+ <div class="panel"><h2 style="margin-top:0">Dados do relatório</h2><p class="sub">Aparecem no cabeçalho e na assinatura do relatório impresso ou salvo em PDF.</p><div class="f" style="margin:12px 0 10px"><label>Nome do escritório</label><input id="pEsc" value="${esc(p.escritorio||'')}"></div><div class="f" style="margin-bottom:10px"><label>Advogado responsável</label><input id="pAdv" value="${esc(p.advogado||'')}"></div><div class="f" style="margin-bottom:10px"><label>OAB (número e estado)</label><input id="pOab" value="${esc(p.oab||'')}" placeholder="Ex.: 12.345/SC"></div><div class="f"><label>Telefone ou e-mail para contato</label><input id="pCon" value="${esc(p.contato||'')}"></div>
+ <h3>Papel timbrado do escritório</h3><p class="sub">Quer que a planilha de cálculo saia com a identidade do seu escritório? Envie aqui o modelo de apresentação das suas petições, em PDF ou imagem, com a logomarca, a marca d'água e os dados do escritório. Ele vira o fundo de todas as páginas da planilha impressa e do PDF baixado. Se o modelo tiver duas páginas, a segunda é usada a partir da página 2 da planilha.</p>
+ ${p.timbrado?`<div class="notice" style="margin:12px 0">Em uso: <b>${esc(p.timbrado.nome||'papel timbrado')}</b></div>`:''}
+ <div class="f" style="margin:12px 0 10px"><label>${p.timbrado?'Trocar o arquivo':'Selecionar o arquivo'} (PDF, PNG ou JPG, até 8 MB)</label><input type="file" accept="application/pdf,image/png,image/jpeg" onchange="enviarTimbrado(this)"></div>
+ ${p.timbrado?`<div class="fields" style="grid-template-columns:1fr 1fr"><div class="f"><label>Espaço do cabeçalho (cm)</label><input id="pTop" value="${esc(String(p.timbrado.topo||'4'))}"></div><div class="f"><label>Espaço do rodapé (cm)</label><input id="pRod" value="${esc(String(p.timbrado.rodape||'3'))}"></div></div><p class="dica">Ajuste os espaços para o texto da planilha não ficar em cima da logomarca nem do rodapé do seu modelo. Depois clique em Salvar configurações.</p><div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="testarTimbrado(this)">Ver planilha de exemplo</button><button class="btn3" onclick="tirarTimbrado()">Remover papel timbrado</button></div>`:''}</div>
  <div class="panel"><h2 style="margin-top:0">Padrões de cálculo</h2><p class="sub">Já vêm preenchidos em todo cálculo novo. Você pode mudar em cada cálculo.</p><div class="f" style="margin:12px 0 10px"><label>Tabela ou índice padrão</label><select id="pInd">${OPT_IND}</select></div><div class="f" style="margin-bottom:10px"><label>Juros padrão</label><select id="pJur">${OPT_JUR}</select></div><div class="f"><label>Honorários de sucumbência padrão (%)</label><input id="pHon" value="${esc(String(p.honorarios||'0'))}"></div>
  <div class="acts"><button class="btn" onclick="salvarPref()">Salvar configurações</button></div></div>
  </div></div>`}
 function posConfig(){const p=pref();if($('#pInd'))$('#pInd').value=p.indice||'t_tjsc';if($('#pJur'))$('#pJur').value=p.juros||'auto'}
-async function salvarPref(){const d={escritorio:$('#pEsc').value.trim(),advogado:$('#pAdv').value.trim(),oab:$('#pOab').value.trim(),contato:$('#pCon').value.trim(),indice:$('#pInd').value,juros:$('#pJur').value,honorarios:$('#pHon').value.trim()||'0'};
+async function salvarPref(){const d={escritorio:$('#pEsc').value.trim(),advogado:$('#pAdv').value.trim(),oab:$('#pOab').value.trim(),contato:$('#pCon').value.trim(),indice:$('#pInd').value,juros:$('#pJur').value,honorarios:$('#pHon').value.trim()||'0'};const tb=pref().timbrado;if(tb)d.timbrado=Object.assign({},tb,$('#pTop')?{topo:$('#pTop').value.trim()||'4',rodape:$('#pRod').value.trim()||'3'}:{});
  const {data,error}=await SB.auth.updateUser({data:{lexcalc:d}});if(error){toast('Não foi possível salvar: '+error.message);return}U.user=data.user;toast('Configurações salvas')}
 async function trocarSenha(){const a=$('#sN1').value,b=$('#sN2').value;if(a.length<8){toast('A senha precisa ter pelo menos 8 caracteres.');return}if(a!==b){toast('As duas senhas não são iguais.');return}
  const {error}=await SB.auth.updateUser({password:a});if(error){toast(/different|same/i.test(error.message)?'A nova senha precisa ser diferente da atual.':'Não foi possível trocar: '+error.message);return}$('#sN1').value=$('#sN2').value='';toast('Senha alterada')}
 async function usarVoucher(){const c=$('#vCod').value.trim().toUpperCase();if(!c){toast('Digite o código do voucher.');return}
  const {data,error}=await SB.rpc('lexcalc_usar_voucher',{p_codigo:c});if(error){toast(error.message.replace(/^.*?: /,''));return}
  await checarAssinatura();toast(`Voucher aplicado: acesso liberado até ${br(String(data))}.`);render()}
+
+/* ============ Planilha em PDF (imprimir e baixar), com papel timbrado ============ */
+let PDFLIB=null;
+function carregarPdfLib(){if(window.PDFLib)return Promise.resolve(window.PDFLib);if(PDFLIB)return PDFLIB;PDFLIB=new Promise((ok,erro)=>{const sc=document.createElement('script');sc.src='assets/pdf-lib.min.js';sc.onload=()=>ok(window.PDFLib);sc.onerror=()=>{PDFLIB=null;erro(new Error('Não foi possível carregar o gerador de PDF. Verifique a internet.'))};document.head.appendChild(sc)});return PDFLIB}
+const nR=v=>(Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const mesExt=d=>['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+d.slice(5,7)-1]+'/'+d.slice(0,4);
+async function timbradoBytes(){const t=pref().timbrado;if(!t||!t.path)return null;try{const {data,error}=await SB.storage.from('lexcalc').download(t.path);if(error||!data)return null;return {tipo:t.tipo,bytes:new Uint8Array(await data.arrayBuffer())}}catch(e){return null}}
+function dadosPlanilha(r){const c=U.calc||{},d=c.dados||{},pf=pref();const cab=[],acr=[];let cols,rows,tot=null,memo=[],titulo='PLANILHA DE DÉBITOS JUDICIAIS';
+ cab.push(['Processo',c.processo||'ainda sem número']);cab.push(['Autor',c.autor||'']);cab.push(['Réu',c.reu||'']);
+ if(r.linhas){const jurNome=(OPT_JUR.match(new RegExp('value="'+d.juros+'">([^<]*)'))||[,''])[1];
+  cab.push(['Data de atualização dos valores',br(r.ate)+' (índices até '+mesExt(mesAnt(r.ate)+'-01')+')']);cab.push(['Indexador utilizado',nomeCrit(d.indice)]);cab.push(['Juros moratórios',jurNome+(d.jurosDesde?', desde '+br(d.jurosDesde):', desde a data de cada valor')]);
+  if(num(d.multa))cab.push(['Multa moratória',String(d.multa).replace('.',',')+'%']);if(num(d.clausula))cab.push(['Cláusula penal',String(d.clausula).replace('.',',')+'% sobre o valor corrigido']);
+  cab.push(['Honorários advocatícios',String(d.honorarios||0).replace('.',',')+'%'+(c.tipo==='liquidacao'&&d.honBase==='causa'?' sobre o valor da causa atualizado':' sobre o valor da condenação')]);
+  if(c.tipo==='liquidacao')titulo='PLANILHA DE LIQUIDAÇÃO DE SENTENÇA';
+  cols=[['Item',24,'c'],['Descrição',0,'l'],['Data',52,'c'],['Valor singelo',66,'r'],['Valor atualizado',70,'r'],['Juros',62,'r'],['Total',72,'r']];
+  rows=r.linhas.map((x,i)=>[String(i+1),x.desc||'',br(x.data),nR(x.valor),nR(x.corrigido),nR(x.juros),nR(x.total)]);
+  tot=['','Totais','',nR(r.principal),nR(r.corrigido),nR(r.juros),nR(r.sub)];
+  if(r.pagos)acr.push(['Pagamentos e depósitos abatidos (já incluídos nos totais)',r.pagos]);
+  acr.push(['Subtotal',r.sub,1]);if(r.astr)acr.push(['Multa diária (astreintes): '+r.astrTxt,r.astr]);if(r.multa)acr.push(['Multa moratória de '+String(d.multa).replace('.',',')+'%',r.multa]);if(r.clausula)acr.push(['Cláusula penal de '+String(d.clausula).replace('.',',')+'%',r.clausula]);if(r.hon)acr.push(['Honorários de sucumbência de '+String(d.honorarios).replace('.',',')+'%',r.hon]);
+  if(r.m523){acr.push(['Débito antes do art. 523 do CPC',r.base523,1]);acr.push(['Multa de 10% (art. 523, §1º, do CPC)',r.m523]);acr.push(['Honorários de 10% (art. 523, §1º, do CPC)',r.h523])}
+  if(r.honc)acr.push(['Honorários contratuais de '+String(d.honCont).replace('.',',')+'%',r.honc]);
+  memo=r.linhas.map((x,i)=>'Item '+(i+1)+' ('+br(x.data)+'): índice '+x.indice+', fator '+x.fator.toFixed(6).replace('.',',')+'; juros: '+x.jurosTxt+'.');
+  if(r.avisos&&r.avisos.length)memo=memo.concat(r.avisos)}
+ else if(r.tipo==='debito'||r.tipo==='restituicao'){titulo=r.tipo==='debito'?'PLANILHA DE DÉBITO FEDERAL ATUALIZADO':'PLANILHA DE RESTITUIÇÃO ATUALIZADA';
+  cab.push(['Data de atualização dos valores',br(r.ate)]);cab.push(['Indexador utilizado','Taxa Selic acumulada (regra da Receita Federal)']);
+  cols=[['Item',24,'c'],['Descrição',0,'l'],['Data',60,'c'],['Valor',80,'r'],['Selic',60,'r'],['Juros',80,'r'],['Total',80,'r']];
+  rows=[['1',r.tipo==='debito'?'Principal do tributo':'Valor pago indevidamente',br(r.venc),nR(r.p),P(r.jp),nR(r.j),nR(r.p+r.j)]];
+  if(r.multa)acr.push(['Multa de mora ('+Math.min(20,r.dd*0.33).toFixed(2).replace('.',',')+'%, '+r.dd+' dias de atraso)',r.multa]);acr.push(['Subtotal',r.sub,1]);if(r.hon)acr.push(['Honorários',r.hon]);
+  memo=r.det.map(([m,v])=>'Selic de '+mesBr(m)+': '+String(v).replace('.',',')+'%');}
+ else{titulo='SIMULAÇÃO DE IBS, CBS E IMPOSTO SELETIVO';cab.push(['Ano',String(r.ano)]);cols=[['Item',24,'c'],['Tributo',0,'l'],['Base',90,'r'],['Alíquota',70,'r'],['Valor',90,'r']];
+  rows=[['1','CBS',nR(r.base),r.aliq[0]+'%',nR(r.cbs)],['2','IBS',nR(r.base),r.aliq[1]+'%',nR(r.ibs)]];if(num(r.aliq[2]))rows.push(['3','Imposto Seletivo',nR(r.base),r.aliq[2]+'%',nR(r.is)])}
+ return {titulo,cab,cols,rows,tot,acr,total:r.total,memo,crit:r.criterios||'',pf}}
+async function gerarPlanilha(){const r=U.calc&&U.calc.resultado;if(!r)throw new Error('Calcule antes de gerar a planilha.');
+ const L=await carregarPdfLib();const {PDFDocument,StandardFonts,rgb}=L;const pdf=await PDFDocument.create();
+ const F=await pdf.embedFont(StandardFonts.Helvetica),FB=await pdf.embedFont(StandardFonts.HelveticaBold);
+ const D=dadosPlanilha(r),pf=D.pf,tb=pf.timbrado||{};const W=595.28,H=841.89,ML=56.7,MR=56.7,cm=28.35;
+ const topo=tb.path?(num(tb.topo)||4)*cm:42,rod=tb.path?(num(tb.rodape)||3)*cm:42;
+ let fundo=null,fundo2=null,fundoImg=false;const tbb=await timbradoBytes();
+ if(tbb){try{if(tbb.tipo==='application/pdf'){const src=await PDFDocument.load(tbb.bytes,{ignoreEncryption:true});const n=src.getPageCount();const emb=await pdf.embedPdf(src,n>1?[0,1]:[0]);fundo=emb[0];fundo2=emb[1]||emb[0]}else{fundoImg=true;fundo=fundo2=tbb.tipo==='image/png'?await pdf.embedPng(tbb.bytes):await pdf.embedJpg(tbb.bytes)}}catch(e){toast('Não foi possível usar o papel timbrado. A planilha sai sem ele.')}}
+ const limpa=t=>{t=String(t??'');let o='';for(const ch of t){try{F.encodeText(ch);o+=ch}catch(e){o+=ch==='×'?'x':'-'}}return o};
+ const larg=(t,f,z)=>(f||F).widthOfTextAtSize(limpa(t),z);
+ const quebra=(t,w,f,z)=>{const P=limpa(t).split(' '),out=[];let l='';P.forEach(p=>{const tt=l?l+' '+p:p;if(larg(tt,f,z)>w&&l){out.push(l);l=p}else l=tt});if(l)out.push(l);return out.length?out:['']};
+ let pg,y,np=0;const preto=rgb(0,0,0),cinza=rgb(.35,.35,.35),verm=rgb(.78,.1,.1);
+ function novaPag(){pg=pdf.addPage([W,H]);np++;const bg=np===1?fundo:fundo2;if(bg){if(fundoImg)pg.drawImage(bg,{x:0,y:0,width:W,height:H});else pg.drawPage(bg,{x:0,y:0,width:W,height:H})}y=H-topo;
+  if(!fundo&&np===1&&pf.escritorio){txt(pf.escritorio,ML,y,FB,12);y-=14;if(pf.advogado){txt(pf.advogado+(pf.oab?' · OAB '+pf.oab:''),ML,y,F,9,cinza);y-=12}if(pf.contato){txt(pf.contato,ML,y,F,9,cinza);y-=12}y-=6;pg.drawLine({start:{x:ML,y},end:{x:W-MR,y},thickness:.6,color:cinza});y-=16}}
+ function txt(t,x,yy,f,z,cor){pg.drawText(limpa(t),{x,y:yy,size:z,font:f||F,color:cor||preto})}
+ function precisa(h){if(y-h<rod){novaPag();return true}return false}
+ novaPag();
+ txt(D.titulo,ML,y,FB,15,verm);y-=8;pg.drawLine({start:{x:ML,y},end:{x:W-MR,y},thickness:.6,color:cinza});y-=16;
+ D.cab.forEach(([k,v])=>{const ls=quebra(k+': '+v,W-ML-MR,F,9.5);ls.forEach((l,i)=>{precisa(13);if(i===0){txt(k+':',ML,y,FB,9.5);txt(l.slice(k.length+1),ML+larg(k+':',FB,9.5),y,F,9.5)}else txt(l,ML,y,F,9.5);y-=13})});y-=8;
+ const tw=W-ML-MR,fixo=D.cols.reduce((s,c)=>s+c[1],0),cw=D.cols.map(c=>c[1]||tw-fixo);
+ const xs=[];let ax=ML;cw.forEach(w=>{xs.push(ax);ax+=w});
+ function celula(t,i,yy,f,z){const a=D.cols[i][2],w=cw[i];const tt=limpa(t);if(a==='r')txt(tt,xs[i]+w-larg(tt,f,z)-2,yy,f,z);else if(a==='c')txt(tt,xs[i]+(w-larg(tt,f,z))/2,yy,f,z);else txt(tt,xs[i]+2,yy,f,z)}
+ function cabTab(){const ls=D.cols.map((c,i)=>quebra(c[0],cw[i]-4,FB,8));const n=Math.max(...ls.map(x=>x.length));precisa(n*10+8);ls.forEach((l,i)=>l.forEach((t,k)=>celula(t,i,y-(n-l.length+k)*10,FB,8)));y-=n*10;pg.drawLine({start:{x:ML,y:y+4},end:{x:W-MR,y:y+4},thickness:.5,color:cinza});y-=8}
+ cabTab();
+ D.rows.forEach(rw=>{const ls=rw.map((t,i)=>D.cols[i][2]==='l'?quebra(t,cw[i]-4,F,8):[t]);const n=Math.max(...ls.map(x=>x.length));if(precisa(n*10+2))cabTab();ls.forEach((l,i)=>l.forEach((t,k)=>celula(t,i,y-k*10,F,8)));y-=n*10+3});
+ if(D.tot){precisa(16);pg.drawLine({start:{x:ML,y:y+7},end:{x:W-MR,y:y+7},thickness:.5,color:cinza});D.tot.forEach((t,i)=>celula(t,i,y-2,FB,8));y-=18}
+ const xv=W-MR;D.acr.forEach(([k,v,neg])=>{const ls=quebra(k,tw-110,neg?FB:F,9);precisa(ls.length*12+4);ls.forEach((l,i)=>{txt(l,xv-100-larg(l,neg?FB:F,9),y-i*12,neg?FB:F,9)});const vv='R$ '+nR(v);txt(vv,xv-larg(vv,neg?FB:F,9),y,neg?FB:F,9);y-=ls.length*12+4});
+ precisa(30);y-=4;pg.drawLine({start:{x:xv-170,y:y+10},end:{x:xv,y:y+10},thickness:.8,color:preto});txt('TOTAL GERAL',xv-100-larg('TOTAL GERAL',FB,10.5),y-4,FB,10.5);const tg='R$ '+nR(D.total);txt(tg,xv-larg(tg,FB,10.5),y-4,FB,10.5);y-=28;
+ const bloco=(tit,linhas,z)=>{if(!linhas.length)return;precisa(30);txt(tit,ML,y,FB,9.5);y-=13;linhas.forEach(t=>quebra(t,tw,F,z).forEach(l=>{precisa(11);txt(l,ML,y,F,z,cinza);y-=11}));y-=8};
+ bloco('Memória de cálculo',D.memo,7.5);if(D.crit)bloco('Critérios',[D.crit],7.5);
+ if(pf.advogado){precisa(60);y-=30;const ln='______________________________';const cx=W/2;txt(ln,cx-larg(ln,F,10)/2,y,F,10);y-=13;txt(pf.advogado,cx-larg(pf.advogado,F,10)/2,y,F,10);if(pf.oab){y-=12;const o='OAB '+pf.oab;txt(o,cx-larg(o,F,9)/2,y,F,9)}}
+ const ps=pdf.getPages(),gerado='Planilha gerada pelo Lex Calc em '+new Date().toLocaleDateString('pt-BR');ps.forEach((p,i)=>{const t=gerado+'   ·   Página '+(i+1)+' de '+ps.length;p.drawText(limpa(t),{x:W-MR-F.widthOfTextAtSize(limpa(t),7),y:Math.max(14,rod-16),size:7,font:F,color:cinza})});
+ pdf.setTitle(D.titulo);pdf.setCreator('Lex Calc');return await pdf.save()}
+function nomeArq(){const c=U.calc||{};return ('Planilha '+(c.autor||'calculo')+' x '+(c.reu||'')+' '+((c.resultado&&c.resultado.ate)||hoje())).replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim()+'.pdf'}
+async function planilha(acao,b){const t0=b?b.textContent:'';if(b){b.disabled=true;b.textContent='Gerando...'}
+ try{const bytes=await gerarPlanilha();const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+  if(acao==='baixar'){const a=document.createElement('a');a.href=url;a.download=nomeArq();document.body.appendChild(a);a.click();a.remove();toast('Planilha baixada')}
+  else{let f=document.getElementById('frPlan');if(f)f.remove();f=document.createElement('iframe');f.id='frPlan';f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';f.src=url;f.onload=()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){window.open(url,'_blank')}};document.body.appendChild(f)}
+  setTimeout(()=>URL.revokeObjectURL(url),120000)}catch(e){toast(e.message||String(e))}finally{if(b){b.disabled=false;b.textContent=t0}}}
+const BOT_PLAN=`<div class="acts noprint"><button class="btn2" onclick="planilha('imprimir',this)">🖨 Imprimir planilha</button><button class="btn" onclick="planilha('baixar',this)">⬇ Baixar planilha em PDF</button></div>`;
+/* Papel timbrado */
+async function enviarTimbrado(inp){const f=inp.files&&inp.files[0];if(!f)return;const ok=['application/pdf','image/png','image/jpeg'];if(!ok.includes(f.type)){toast('Envie um arquivo PDF, PNG ou JPG.');inp.value='';return}if(f.size>8*1048576){toast('O arquivo passa de 8 MB. Envie uma versão menor.');inp.value='';return}
+ const ext={'application/pdf':'pdf','image/png':'png','image/jpeg':'jpg'}[f.type];const path=U.user.id+'/timbrado.'+ext;toast('Enviando o papel timbrado...');
+ const old=pref().timbrado;if(old&&old.path&&old.path!==path){try{await SB.storage.from('lexcalc').remove([old.path])}catch(e){}}
+ const {error}=await SB.storage.from('lexcalc').upload(path,f,{upsert:true,contentType:f.type});if(error){toast('Não foi possível enviar: '+error.message);inp.value='';return}
+ const p=Object.assign({},pref(),{timbrado:{path,tipo:f.type,nome:f.name,topo:(old&&old.topo)||'4',rodape:(old&&old.rodape)||'3'}});const {data,error:e2}=await SB.auth.updateUser({data:{lexcalc:p}});if(e2){toast('Arquivo enviado, mas não foi possível salvar: '+e2.message);return}U.user=data.user;toast('Papel timbrado salvo');render()}
+async function tirarTimbrado(){const t=pref().timbrado;if(t&&t.path){try{await SB.storage.from('lexcalc').remove([t.path])}catch(e){}}const p=Object.assign({},pref());delete p.timbrado;const {data,error}=await SB.auth.updateUser({data:{lexcalc:p}});if(error){toast(error.message);return}U.user=data.user;toast('Papel timbrado removido');render()}
+async function testarTimbrado(b){const ant=U.calc;U.calc={processo:'0000000-00.0000.8.24.0000',autor:'Autor de exemplo',reu:'Réu de exemplo',tipo:'juridico',dados:Object.assign(vazio('juridico').dados,{juros:'1'}),resultado:{tipo:'juridico',ate:hoje(),linhas:[{data:'2025-01-10',desc:'Valor de exemplo',valor:1000,fator:1.05,corrigido:1050,juros:230,jurosTxt:'1% ao mês',total:1280,indice:'TJSC'}],sub:1280,principal:1000,corrigido:1050,juros:230,multa:0,clausula:0,hon:128,honc:0,m523:0,h523:0,pagos:0,astr:0,total:1408,avisos:[],criterios:'Exemplo para conferir o papel timbrado.'}};
+ try{await planilha('imprimir',b)}finally{U.calc=ant}}
 
 /* ============ Salvar, buscar e abrir ============ */
 async function salvar(){lerForm();const c=U.calc;
