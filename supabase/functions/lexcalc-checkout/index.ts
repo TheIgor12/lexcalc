@@ -2,7 +2,7 @@
 // Segredos necessários no Supabase: ASAAS_API_KEY. Opcional: ASAAS_AMBIENTE=sandbox para testes.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
-const PRECO = 69.9;
+const PRECO = 79.99;
 const CHAVE_ADM: string = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || String(Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}"))[0] ?? "");
 const cors = {
   "Access-Control-Allow-Origin": "*",

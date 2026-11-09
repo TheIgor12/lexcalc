@@ -30,9 +30,15 @@ Deno.serve(async (req) => {
     let dono = String(p.externalReference ?? "");
     if (!UUID.test(dono) && p.subscription) dono = String((await get(`/subscriptions/${p.subscription}`))?.externalReference ?? "");
     if (!UUID.test(dono) && p.customer) dono = String((await get(`/customers/${p.customer}`))?.externalReference ?? "");
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, CHAVE_ADM, { auth: { persistSession: false } });
+    // Link de pagamento sem identificação: procura a conta do Lex Calc pelo e-mail de quem pagou
+    if (!UUID.test(dono) && p.customer) {
+      const cli = await get(`/customers/${p.customer}`);
+      const email = String(cli?.email ?? "").trim().toLowerCase();
+      if (email) { const { data: uid } = await sb.rpc("lexcalc_usuario_por_email", { p_email: email }); if (uid) dono = String(uid); }
+    }
     if (!UUID.test(dono)) return ok();
 
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, CHAVE_ADM, { auth: { persistSession: false } });
     const { error } = await sb.rpc("lexcalc_liberar_mes", { p_user: dono, p_pagamento: "asaas-" + id, p_valor: p.value, p_meio: p.billingType ?? null });
     if (error) return new Response("erro ao liberar", { status: 500 });
     return ok();
