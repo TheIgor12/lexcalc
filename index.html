@@ -311,7 +311,7 @@ function resHTML(r){if(!r)return '';
 
 
 /* ============ Teste grátis e assinatura ============ */
-const ASS={cfg:{preco:'R$ 29,90 por mês',link_pagamento:'https://www.asaas.com/000/c/99r1jm3tyroucxqv',whatsapp:'5547988432859',dias_teste:14},pagoAte:null,ok:true,dias:14};
+const ASS={cfg:{preco:'R$ 29,90 por mês',link_pagamento:'https://www.asaas.com/000/c/3d8jtlc6wgzvm3zk',whatsapp:'5547988432859',dias_teste:14},pagoAte:null,ok:true,dias:14};
 function docOk(v){const d=String(v).replace(/\D/g,'');const dv=(b,p)=>{let s=0;for(let i=0;i<b.length;i++)s+=+b[i]*p[i];const r=s%11;return r<2?0:11-r};
  if(d.length===11){if(/^(\d)\1+$/.test(d))return false;const p1=[10,9,8,7,6,5,4,3,2],p2=[11,10,9,8,7,6,5,4,3,2];return dv(d.slice(0,9),p1)==d[9]&&dv(d.slice(0,10),p2)==d[10]}
  if(d.length===14){if(/^(\d)\1+$/.test(d))return false;const p1=[5,4,3,2,9,8,7,6,5,4,3,2],p2=[6,5,4,3,2,9,8,7,6,5,4,3,2];return dv(d.slice(0,12),p1)==d[12]&&dv(d.slice(0,13),p2)==d[13]}return false}
