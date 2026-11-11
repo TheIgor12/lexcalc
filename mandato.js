@@ -354,6 +354,18 @@ function lmDocumentos(){let L=LM.docs;if(LM.filtro)L=L.filter(x=>x.cliente_id===
  return `<div class="panel"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><select onchange="LM.filtro=this.value;render()" style="background:#111e27;border:1px solid #6e6a5e;border-radius:7px;padding:10px;color:#fff"><option value="">Todos os documentos</option>${Object.entries(LM_AREAS).map(([k,n])=>`<option value="${k}" ${LM.filtro===k?'selected':''}>${n}</option>`).join('')}${LM_STATUS.map(s=>`<option ${LM.filtro===s?'selected':''}>${s}</option>`).join('')}</select>${LM.filtro&&!LM_AREAS[LM.filtro]&&!LM_STATUS.includes(LM.filtro)?'<button class="btn3" onclick="LM.filtro=\'\';render()">Limpar filtro do cliente</button>':''}</div>
  <div style="margin-top:14px">${L.length?lmTabelaDocs(L):'<p class="sub">Nenhum documento.</p>'}</div></div>`}
 
+/* Envio do modelo direto pela tela de Configurações */
+function cfgModelosResumo(){if(!LM.carregado)return 'Depois de enviar, o documento abre no LexMandato com os campos já reconhecidos, para você conferir e salvar.';
+ const g={};LM.modelos.forEach(m=>{g[m.tipo]=(g[m.tipo]||0)+1});
+ const t=Object.keys(LM_DOCS).filter(k=>g[k]).map(k=>g[k]+' '+(g[k]===1?LM_DOCS[k].toLowerCase():LM_DOCS[k].toLowerCase()+'s'));
+ return t.length?'Modelos já enviados: '+t.join(', ')+'.':'Nenhum modelo enviado ainda. Sem modelo próprio, o LexMandato usa o modelo padrão.'}
+async function cfgModelo(inp,tipo){const f=inp.files&&inp.files[0];if(!f)return;inp.value='';
+ if(f.size>2.6*1048576&&/\.docx$/i.test(f.name)){toast('O arquivo passa de 2,6 MB. Reduza as imagens do timbre e envie de novo.');return}
+ U.view='mandato';LM.tab='modelos';LM.semDx=false;
+ if(!LM.carregado){toast('Abrindo o LexMandato...');await lmCarregar()}
+ if(LM.erroTabela){render();toast('O LexMandato ainda não foi ativado no banco de dados.');return}
+ LM.mod={tipo,area:'todas',nome:'',texto:''};render();
+ await lmImportar(f)}
 /* ---------- Modelos do escritório ---------- */
 function lmModelos(){if(LM.mod)return lmEditor();const G={};LM.modelos.forEach(m=>{(G[m.tipo]=G[m.tipo]||[]).push(m)});
  return `<div class="panel"><h2>Modelos do escritório</h2><p class="sub">Envie a procuração ou o contrato do escritório em Word (.docx). O sistema reconhece sozinho o nome, o CPF, o RG, a nacionalidade, o estado civil, a profissão, o endereço, o local e a data, e liga cada trecho ao cadastro. O documento sai com a fonte, o cabeçalho, o rodapé, o timbre e a marca d'água do próprio arquivo. Sem modelo próprio, o LexMandato usa o modelo padrão.</p>

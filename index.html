@@ -78,7 +78,7 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 <script src="/cliques.js" data-modo="app" defer></script></head>
 <body>
 <div id="app"></div>
-<script src="mandato.js?v=5"></script>
+<script src="mandato.js?v=6"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const SB=supabase.createClient('https://blszdbjpxgtloblxlusr.supabase.co','sb_publishable_0Tns_mDN2N1iQmw_sEzFXw_SRMy1uXK');
@@ -369,8 +369,17 @@ function vConfig(){const p=pref();const u=U.user;
  <h3>Papel timbrado do escritório</h3><p class="sub">Quer que a planilha de cálculo saia com a identidade do seu escritório? Envie aqui o modelo de apresentação das suas petições, em PDF ou imagem, com a logomarca, a marca d'água e os dados do escritório. Ele vira o fundo de todas as páginas da planilha impressa e do PDF baixado. Se o modelo tiver duas páginas, a segunda é usada a partir da página 2 da planilha.</p>
  <div class="notice" style="margin:12px 0"><b>Antes de enviar, deixe o corpo da folha em branco.</b> Mantenha só a logomarca, o cabeçalho, o rodapé e a marca d'água, que deve ser bem clara. Apague todo o texto do meio da página, como endereçamento ao juiz, nome do cliente, número do processo e assinatura: tudo o que estiver no arquivo aparece por baixo da planilha. Use o tamanho A4. No Word, apague o texto do corpo e salve como PDF.</div>
  ${p.timbrado?`<div class="notice" style="margin:12px 0">Em uso: <b>${esc(p.timbrado.nome||'papel timbrado')}</b></div>`:''}
- <div class="f" style="margin:12px 0 10px"><label>${p.timbrado?'Trocar o arquivo':'Selecionar o arquivo'} (PDF, PNG ou JPG, até 8 MB)</label><input type="file" accept="application/pdf,image/png,image/jpeg" onchange="enviarTimbrado(this)"></div>
+ <div class="acts" style="justify-content:flex-start;margin:12px 0 10px"><label class="btn" style="cursor:pointer">${p.timbrado?'Trocar o papel timbrado':'Enviar o papel timbrado'} (PDF, PNG ou JPG, até 8 MB)<input type="file" accept="application/pdf,image/png,image/jpeg" style="display:none" onchange="enviarTimbrado(this)"></label></div>
  ${p.timbrado?`<div class="fields" style="grid-template-columns:1fr 1fr"><div class="f"><label>Espaço do cabeçalho (cm)</label><input id="pTop" value="${esc(String(p.timbrado.topo||'4'))}"></div><div class="f"><label>Espaço do rodapé (cm)</label><input id="pRod" value="${esc(String(p.timbrado.rodape||'3'))}"></div></div><p class="dica">Ajuste os espaços para o texto da planilha não ficar em cima da logomarca nem do rodapé do seu modelo. Depois clique em Salvar configurações.</p><div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="testarTimbrado(this)">Ver planilha de exemplo</button><button class="btn3" onclick="tirarTimbrado()">Remover papel timbrado</button></div>`:''}</div>
+ <div class="panel"><h2 style="margin-top:0">Modelos do escritório</h2>
+ <p class="sub">Envie aqui a sua procuração e o seu contrato de honorários, do jeito que o escritório já usa, em Word (.docx). O sistema mantém a fonte, o cabeçalho, o rodapé, o timbre e a marca d'água do arquivo, reconhece sozinho os dados que mudam de cliente para cliente e monta o documento preenchido no LexMandato.</p>
+ <div class="acts" style="justify-content:flex-start;margin-top:14px">
+  <label class="btn" style="cursor:pointer">Enviar a procuração<input type="file" accept=".docx,.doc,.pdf,.txt" style="display:none" onchange="cfgModelo(this,'procuracao')"></label>
+  <label class="btn" style="cursor:pointer">Enviar o contrato<input type="file" accept=".docx,.doc,.pdf,.txt" style="display:none" onchange="cfgModelo(this,'contrato')"></label>
+  <label class="btn2" style="cursor:pointer">Outro documento, você escolhe o tipo<input type="file" accept=".docx,.doc,.pdf,.txt" style="display:none" onchange="cfgModelo(this,'declaracao')"></label>
+ </div>
+ <p class="sub" style="margin-top:10px">${cfgModelosResumo()}</p>
+ <div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="ir('mandato');LM.tab='modelos';render()">Ver todos os modelos</button></div></div>
  <div class="panel"><h2 style="margin-top:0">Padrões de cálculo</h2><p class="sub">Já vêm preenchidos em todo cálculo novo. Você pode mudar em cada cálculo.</p><div class="f" style="margin:12px 0 10px"><label>Tabela ou índice padrão</label><select id="pInd">${OPT_IND}</select></div><div class="f" style="margin-bottom:10px"><label>Juros padrão</label><select id="pJur">${OPT_JUR}</select></div><div class="f"><label>Honorários de sucumbência padrão (%)</label><input id="pHon" value="${esc(String(p.honorarios||'0'))}"></div>
  <div class="acts"><button class="btn" onclick="salvarPref()">Salvar configurações</button></div></div>
  </div></div>`}
