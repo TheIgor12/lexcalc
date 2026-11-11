@@ -3,7 +3,7 @@
 // Segredos necessários: ASAAS_API_KEY e ASAAS_WEBHOOK_TOKEN (o mesmo token cadastrado no webhook do Asaas).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
-const PRECO = 69.9;
+const PRECO = 29.9;
 const CHAVE_ADM: string = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || String(Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}"))[0] ?? "");
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const API = Deno.env.get("ASAAS_AMBIENTE") === "sandbox" ? "https://api-sandbox.asaas.com/v3" : "https://api.asaas.com/v3";
