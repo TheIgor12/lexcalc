@@ -39,6 +39,7 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 .acts{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px}
 .notice{padding:14px 16px;background:#332612;border:1px solid #9b763c;border-radius:10px;color:#f6dba5;line-height:1.5;margin:16px 0}
 .notice.bad{background:#3a1714;border-color:#a14a3c;color:#ffd3c9}
+.notice.ok{background:#12291c;border-color:#3f8c5f;color:#cdf3da}
 .res{margin-top:22px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.kpi{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card2)}.kpi small{color:var(--mut);display:block;font-size:12px}.kpi b{font-size:20px;color:var(--gold2)}
 .rec{display:flex;gap:12px;align-items:center;justify-content:space-between;border:1px solid #4d4231;border-radius:10px;padding:12px 14px;margin-bottom:8px;background:#0b1620}.rec b{font-size:15px}.rec small{color:var(--mut)}
 .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#3a2c14;color:var(--gold2);margin-left:6px}.tag.bad{background:#4a1f1a;color:#ffb3a6}
@@ -67,7 +68,7 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 <script src="/cliques.js" data-modo="app" defer></script></head>
 <body>
 <div id="app"></div>
-<script src="mandato.js?v=1"></script>
+<script src="mandato.js?v=3"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const SB=supabase.createClient('https://blszdbjpxgtloblxlusr.supabase.co','sb_publishable_0Tns_mDN2N1iQmw_sEzFXw_SRMy1uXK');
