@@ -1,6 +1,6 @@
 /* LexMandato by BlackSolutions: procurações, declarações e contratos com a identidade do escritório.
    Módulo do Lex Calc. Usa o login, a assinatura e o papel timbrado do Lex Calc. Dados salvos na nuvem (tabelas lm_*). */
-const LM={tab:'painel',esc:null,clientes:[],docs:[],modelos:[],doc:null,passo:1,busca:'',filtro:'',carregado:false,erroTabela:false,mod:null};
+const LM={tab:'painel',esc:null,org:null,orgs:[],equipe:[],semOrg:false,convite:null,lote:null,clientes:[],docs:[],modelos:[],doc:null,passo:1,busca:'',filtro:'',carregado:false,erroTabela:false,mod:null};
 
 /* ============ Listas ============ */
 const LM_AREAS={civel:'Cível',trabalhista:'Trabalhista',previdenciario:'Previdenciário'};
@@ -176,19 +176,70 @@ function lmPendencias(d){const P=[],c=d.cliente,r=d.rep||{};
  if(!lmDocsSel(d).length)P.push(['erro','Escolha pelo menos um documento para gerar.']);return P}
 
 /* ============ Nuvem ============ */
+/* Escritório atual: a biblioteca de modelos, os clientes e os documentos pertencem
+   ao escritório, não ao login. Um login pode ser membro de mais de um escritório. */
+async function lmCarregarOrg(){LM.org=null;LM.orgs=[];LM.equipe=[];LM.semOrg=false;
+ try{const r=await SB.from('lm_membros').select('escritorio_id,papel,criado_em,lm_escritorios(id,nome,dados)').eq('user_id',U.user.id).order('criado_em');
+  if(r.error){LM.semOrg=true;return}
+  const L=(r.data||[]).filter(x=>x.lm_escritorios);
+  if(!L.length){LM.semOrg=true;return}
+  LM.orgs=L.map(y=>({id:y.escritorio_id,papel:y.papel,nome:y.lm_escritorios.nome}));
+  let sel=null;try{sel=localStorage.getItem('lm_org')}catch(e){}
+  const x=L.find(y=>y.escritorio_id===sel)||L[0];
+  LM.org={id:x.escritorio_id,papel:x.papel,nome:x.lm_escritorios.nome,dados:x.lm_escritorios.dados||{}};
+  const q=await SB.from('lm_membros').select('user_id,email,papel,criado_em').eq('escritorio_id',LM.org.id).order('criado_em');
+  LM.equipe=q.data||[];
+ }catch(e){LM.semOrg=true}}
+function lmOrgFiltro(q){return LM.org?q.or('escritorio_id.eq.'+LM.org.id+',escritorio_id.is.null'):q}
+function lmAdministra(){return !!(LM.org&&(LM.org.papel==='dono'||LM.org.papel==='suporte'))}
 async function lmCarregar(forcar){if(LM.carregado&&!forcar)return;LM.erroTabela=false;
- const [e,c,dd,m]=await Promise.all([SB.from('lm_escritorio').select('dados').maybeSingle(),SB.from('lm_clientes').select('*').order('atualizado_em',{ascending:false}).limit(300),SB.from('lm_documentos').select('id,cliente_id,cliente_nome,area,titulo,status,atualizado_em,dados').order('atualizado_em',{ascending:false}).limit(200),SB.from('lm_modelos').select('*').eq('ativo',true).order('criado_em',{ascending:false})]);
+ await lmCarregarOrg();
+ const [e,c,dd,m]=await Promise.all([SB.from('lm_escritorio').select('dados').maybeSingle(),lmOrgFiltro(SB.from('lm_clientes').select('*')).order('atualizado_em',{ascending:false}).limit(300),lmOrgFiltro(SB.from('lm_documentos').select('id,cliente_id,cliente_nome,area,titulo,status,atualizado_em,dados')).order('atualizado_em',{ascending:false}).limit(200),lmOrgFiltro(SB.from('lm_modelos').select('*').eq('ativo',true)).order('criado_em',{ascending:false})]);
  if(e.error&&/relation|does not exist|schema cache/i.test(e.error.message)){LM.erroTabela=true;LM.carregado=true;return}
- const p=pref();LM.esc=(e.data&&e.data.dados)||{nome:p.escritorio||'',cidade:'',uf:'SC',advogados:p.advogado?[{nome:p.advogado,oab:String(p.oab||'').replace(/\D/g,''),uf:'SC',nacionalidade:'brasileiro(a)'}]:[],sociedade:{}};
+ const p=pref();const base={nome:p.escritorio||'',cidade:'',uf:'SC',advogados:p.advogado?[{nome:p.advogado,oab:String(p.oab||'').replace(/\D/g,''),uf:'SC',nacionalidade:'brasileiro(a)'}]:[],sociedade:{}};
+ if(LM.org){LM.esc=Object.assign({},base,LM.org.dados||{});LM.esc.nome=(LM.org.dados&&LM.org.dados.nome)||LM.org.nome}
+ else LM.esc=(e.data&&e.data.dados)||base;
  LM.clientes=c.data||[];LM.docs=dd.data||[];LM.modelos=m.data||[];LM.carregado=true}
-async function lmSalvarEsc(){const {error}=await SB.from('lm_escritorio').upsert({dono:U.user.id,dados:LM.esc,atualizado_em:new Date().toISOString()});if(error){toast('Não foi possível salvar: '+error.message);return false}toast('Dados do escritório salvos');return true}
-async function lmSalvarCliente(d){const c=d.cliente;const nome=c.tipo==='pj'?c.razao:c.nome;if(!nome)return null;const row={nome,documento:lmDig(c.tipo==='pj'?c.cnpj:c.cpf),dados:{cliente:c,rep:d.rep},atualizado_em:new Date().toISOString()};
+async function lmSalvarEsc(){
+ if(LM.org){const nome=(LM.esc.nome||'').trim()||LM.org.nome;
+  const {error}=await SB.from('lm_escritorios').update({nome,dados:LM.esc,atualizado_em:new Date().toISOString()}).eq('id',LM.org.id);
+  if(error){toast('Não foi possível salvar: '+error.message);return false}
+  LM.org.nome=nome;LM.org.dados=LM.esc;toast('Dados do escritório salvos');return true}
+ const {error}=await SB.from('lm_escritorio').upsert({dono:U.user.id,dados:LM.esc,atualizado_em:new Date().toISOString()});if(error){toast('Não foi possível salvar: '+error.message);return false}toast('Dados do escritório salvos');return true}
+
+/* ---------- Escritório, equipe e convites ---------- */
+const LM_PAPEIS={dono:'Responsável',equipe:'Equipe',suporte:'Suporte BlackSolutions'};
+async function lmCriarEscritorio(){const nome=($('#lmOrgNome')&&$('#lmOrgNome').value||'').trim();
+ if(!nome){toast('Escreva o nome do escritório.');return}
+ const {error}=await SB.rpc('lm_criar_escritorio',{p_nome:nome});
+ if(error){toast(lmErroSql(error));return}
+ LM.carregado=false;await lmCarregar(true);render();toast('Escritório criado. Agora você é o responsável.')}
+async function lmGerarConvite(papel){if(!LM.org)return;
+ const {data,error}=await SB.rpc('lm_novo_convite',{p_escritorio:LM.org.id,p_papel:papel||'equipe'});
+ if(error){toast(lmErroSql(error));return}
+ LM.convite={codigo:data,papel:papel||'equipe'};render()}
+async function lmUsarConvite(){const c=($('#lmConvCod')&&$('#lmConvCod').value||'').trim().toUpperCase();
+ if(c.length<6){toast('Digite o código completo.');return}
+ const {data,error}=await SB.rpc('lm_usar_convite',{p_codigo:c});
+ if(error){toast(lmErroSql(error));return}
+ try{localStorage.setItem('lm_org',data)}catch(e){}
+ LM.carregado=false;await lmCarregar(true);render();toast('Você entrou no escritório.')}
+async function lmRemoverMembro(uid,email){if(!confirm('Tirar o acesso de '+email+'? Os documentos e modelos continuam no escritório.'))return;
+ const {error}=await SB.rpc('lm_remover_membro',{p_escritorio:LM.org.id,p_user:uid});
+ if(error){toast(lmErroSql(error));return}
+ LM.carregado=false;await lmCarregar(true);render();toast('Acesso removido.')}
+async function lmTrocarOrg(id){try{localStorage.setItem('lm_org',id)}catch(e){}
+ LM.carregado=false;LM.doc=null;LM.mod=null;await lmCarregar(true);render();toast('Agora você está no escritório '+(LM.org?LM.org.nome:''))}
+function lmErroSql(e){const m=String(e.message||e||'');
+ if(/relation|does not exist|schema cache|function/i.test(m))return 'A parte de escritório ainda não foi ativada no banco de dados.';
+ return m.replace(/^.*?:\s*/,'')||'Não foi possível concluir.'}
+async function lmSalvarCliente(d){const c=d.cliente;const nome=c.tipo==='pj'?c.razao:c.nome;if(!nome)return null;const row={nome,documento:lmDig(c.tipo==='pj'?c.cnpj:c.cpf),dados:{cliente:c,rep:d.rep},atualizado_em:new Date().toISOString()};if(LM.org)row.escritorio_id=LM.org.id;
  let r;if(d.clienteId)r=await SB.from('lm_clientes').update(row).eq('id',d.clienteId).select('id').single();else r=await SB.from('lm_clientes').insert(row).select('id').single();
  if(r.error){toast('Não foi possível salvar o cliente: '+r.error.message);return null}d.clienteId=r.data.id;return r.data.id}
 async function lmSalvarDoc(status,silencioso){const d=LM.doc;if(!d)return false;if(status)d.status=status;await lmSalvarCliente(d);
  const textos={};lmDocsSel(d).forEach(k=>{textos[k]={texto:lmTexto(k,d),modelo:(lmModeloDe(k,d)||{nome:'Modelo padrão LexMandato'}).nome,versao:(lmModeloDe(k,d)||{}).versao||null}});
  const hist=(d.historico||[]).concat([{quando:new Date().toISOString(),quem:U.user.email,acao:status||'Salvo'}]).slice(-40);d.historico=hist;
- const row={cliente_id:d.clienteId||null,cliente_nome:lmTitular(d),area:d.area,titulo:lmDocsSel(d).map(k=>LM_DOCS[k]).join(', ')||'Documento',status:d.status,dados:d,textos,atualizado_em:new Date().toISOString()};
+ const row={cliente_id:d.clienteId||null,cliente_nome:lmTitular(d),area:d.area,titulo:lmDocsSel(d).map(k=>LM_DOCS[k]).join(', ')||'Documento',status:d.status,dados:d,textos,atualizado_em:new Date().toISOString()};if(LM.org)row.escritorio_id=LM.org.id;
  let r;if(d.id)r=await SB.from('lm_documentos').update(row).eq('id',d.id).select('id').single();else r=await SB.from('lm_documentos').insert(row).select('id').single();
  if(r.error){toast('Não foi possível salvar na nuvem: '+r.error.message);return false}d.id=r.data.id;if(!silencioso)toast('Salvo na nuvem como '+d.status);lmCarregar(true);return true}
 async function lmAbrirDoc(id){const {data,error}=await SB.from('lm_documentos').select('*').eq('id',id).single();if(error){toast('Não foi possível abrir o documento');return}
@@ -354,6 +405,38 @@ function lmDocumentos(){let L=LM.docs;if(LM.filtro)L=L.filter(x=>x.cliente_id===
  return `<div class="panel"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><select onchange="LM.filtro=this.value;render()" style="background:#111e27;border:1px solid #6e6a5e;border-radius:7px;padding:10px;color:#fff"><option value="">Todos os documentos</option>${Object.entries(LM_AREAS).map(([k,n])=>`<option value="${k}" ${LM.filtro===k?'selected':''}>${n}</option>`).join('')}${LM_STATUS.map(s=>`<option ${LM.filtro===s?'selected':''}>${s}</option>`).join('')}</select>${LM.filtro&&!LM_AREAS[LM.filtro]&&!LM_STATUS.includes(LM.filtro)?'<button class="btn3" onclick="LM.filtro=\'\';render()">Limpar filtro do cliente</button>':''}</div>
  <div style="margin-top:14px">${L.length?lmTabelaDocs(L):'<p class="sub">Nenhum documento.</p>'}</div></div>`}
 
+/* ---------- Painel do escritório nas Configurações ---------- */
+function cfgEquipe(){
+ if(!LM.carregado)return `<div class="panel"><h2 style="margin-top:0">Escritório e equipe</h2><p class="sub">Carregando...</p><div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="cfgCarregarLM()">Carregar</button></div></div>`;
+ if(LM.erroTabela)return `<div class="panel"><h2 style="margin-top:0">Escritório e equipe</h2><div class="notice bad">O LexMandato ainda não foi ativado no banco de dados.</div></div>`;
+ const entrar=`<h3>Entrar em um escritório já existente</h3><p class="sub">Recebeu um código de convite? Digite abaixo. Você passa a enxergar os modelos, os clientes e os documentos daquele escritório.</p>
+  <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap"><input id="lmConvCod" placeholder="Código do convite" style="flex:1;min-width:180px;text-transform:uppercase;background:#111e27;border:1px solid #6e6a5e;border-radius:7px;padding:11px;color:#fff" onkeydown="if(event.key==='Enter')lmUsarConvite()"><button class="btn2" onclick="lmUsarConvite()">Usar convite</button></div>`;
+
+ if(LM.semOrg||!LM.org)return `<div class="panel"><h2 style="margin-top:0">Escritório e equipe</h2>
+  <p class="sub">Os modelos, os clientes e os documentos do LexMandato pertencem ao escritório, não ao login. Assim, quando outra pessoa do escritório criar o acesso dela, encontra a mesma biblioteca, sem ninguém dividir senha.</p>
+  <div class="notice" style="margin:12px 0">Você ainda não está em nenhum escritório. Crie o seu ou use um código de convite.</div>
+  <div class="f" style="margin-bottom:10px"><label>Nome do escritório</label><input id="lmOrgNome" placeholder="Edinei Marcondes Advogados Associados"></div>
+  <div class="acts" style="justify-content:flex-start"><button class="btn" onclick="lmCriarEscritorio()">Criar escritório</button></div>
+  ${entrar}</div>`;
+
+ const eu=U.user.id;const adm=lmAdministra();
+ const linhas=LM.equipe.map(m=>`<div class="rec"><div><b>${esc(m.email||'sem e-mail')}</b>${m.user_id===eu?' <span class="selo">você</span>':''}<br><small>${LM_PAPEIS[m.papel]||m.papel} · desde ${br((m.criado_em||'').slice(0,10))}</small></div>${adm&&m.user_id!==eu?`<div><button class="btn3" style="color:var(--bad)" onclick="lmRemoverMembro('${m.user_id}','${esc(m.email||'')}')">Tirar acesso</button></div>`:'<div></div>'}</div>`).join('');
+
+ const troca=LM.orgs.length>1?`<div class="f" style="margin:12px 0"><label>Escritório em que você está trabalhando agora</label><select onchange="lmTrocarOrg(this.value)">${LM.orgs.map(o=>`<option value="${o.id}" ${o.id===LM.org.id?'selected':''}>${esc(o.nome)} (${LM_PAPEIS[o.papel]||o.papel})</option>`).join('')}</select></div><p class="dica">Tudo o que você enviar e gerar fica no escritório selecionado aqui.</p>`:'';
+
+ const conv=adm?`<h3>Dar acesso a mais alguém</h3><p class="sub">Gere um código, entregue para a pessoa e peça que ela crie o acesso dela no Lex Calc e use o código nesta mesma tela. O código serve uma vez só e vence em 30 dias. Ninguém precisa dividir senha.</p>
+  <div class="acts" style="justify-content:flex-start;margin-top:10px"><button class="btn2" onclick="lmGerarConvite('equipe')">Gerar código para a equipe</button><button class="btn3" onclick="lmGerarConvite('dono')">Gerar código de responsável</button></div>
+  ${LM.convite?`<div class="notice" style="margin:12px 0">Código gerado para <b>${LM_PAPEIS[LM.convite.papel]}</b>: <b style="font-size:20px;letter-spacing:3px">${esc(LM.convite.codigo)}</b><br><small>Copie agora. Ele continua válido por 30 dias e some desta tela quando você sair.</small></div>`:''}`:'';
+
+ return `<div class="panel"><h2 style="margin-top:0">Escritório e equipe</h2>
+  <p>Escritório: <b>${esc(LM.org.nome)}</b><br><span class="sub">Seu papel: ${LM_PAPEIS[LM.org.papel]||LM.org.papel}</span></p>
+  ${troca}
+  <h3>Quem tem acesso</h3>${linhas||'<p class="sub">Ninguém mais.</p>'}
+  ${conv}
+  ${entrar}
+  <div class="acts" style="justify-content:flex-start;margin-top:14px"><button class="btn2" onclick="ir('mandato');lmIr('escritorio')">Dados do escritório e advogados</button></div></div>`}
+async function cfgCarregarLM(){await lmCarregar(true);render()}
+
 /* Envio do modelo direto pela tela de Configurações */
 function cfgModelosResumo(){if(!LM.carregado)return 'Depois de enviar, o documento abre no LexMandato com os campos já reconhecidos, para você conferir e salvar.';
  const g={};LM.modelos.forEach(m=>{g[m.tipo]=(g[m.tipo]||0)+1});
@@ -366,8 +449,75 @@ async function cfgModelo(inp,tipo){const f=inp.files&&inp.files[0];if(!f)return;
  if(LM.erroTabela){render();toast('O LexMandato ainda não foi ativado no banco de dados.');return}
  LM.mod={tipo,area:'todas',nome:'',texto:''};render();
  await lmImportar(f)}
+/* ---------- Envio de vários modelos de uma vez ---------- */
+function lmAdivTipo(n){const x=String(n||'').toLowerCase();
+ if(/substabel/.test(x))return 'substabelecimento';
+ if(/preposi|preposto/.test(x))return 'preposicao';
+ if(/hipossuf|declara/.test(x))return 'declaracao';
+ if(/termo.*(inss|responsab)|responsab.*inss/.test(x))return 'termo_inss';
+ if(/contrato|honor/.test(x))return 'contrato';
+ if(/procura/.test(x))return 'procuracao';
+ return 'procuracao'}
+function lmAdivArea(n){const x=String(n||'').toLowerCase();
+ if(/previden|inss|aposentad|bpc|loas|aux[ií]lio|benef[ií]c|pens[aã]o|rural/.test(x))return 'previdenciario';
+ if(/trabalh|clt|rescis|verbas|v[ií]nculo|hora extra/.test(x))return 'trabalhista';
+ if(/c[ií]vel|civil|consumidor|banc[aá]r|revision|indeniza/.test(x))return 'civel';
+ return 'todas'}
+async function cfgLote(inp){const fs=[].slice.call(inp.files||[]);inp.value='';if(!fs.length)return;
+ U.view='mandato';LM.tab='modelos';LM.mod=null;LM.semDx=false;
+ if(!LM.carregado){toast('Abrindo o LexMandato...');await lmCarregar()}
+ if(LM.erroTabela){render();toast('O LexMandato ainda não foi ativado no banco de dados.');return}
+ LM.lote=fs.map(f=>({f,nome:f.name.replace(/\.\w+$/,''),tipo:lmAdivTipo(f.name),area:lmAdivArea(f.name),estado:'fila',campos:0,erro:'',dx:null}));
+ render();await lmLoteLer()}
+async function lmLoteLer(){if(!LM.lote)return;
+ for(let i=0;i<LM.lote.length;i++){const it=LM.lote[i];if(it.estado!=='fila')continue;
+  it.estado='lendo';render();
+  try{
+   if(/\.doc$/i.test(it.f.name))throw new Error('Arquivo .doc antigo. Abra no Word, use Salvar como e escolha .docx.');
+   if(!/\.docx$/i.test(it.f.name))throw new Error('Envie em Word .docx. Só esse formato guarda o timbre e a marca d\'água.');
+   if(it.f.size>2.6*1048576)throw new Error('Passa de 2,6 MB. Reduza as imagens do timbre e envie de novo.');
+   const buf=await it.f.arrayBuffer();const r=await lmDxAbrir(new Uint8Array(buf));const pars=lmDxPars(r.dom);
+   it.dx={arquivo:it.f.name,b64:lmB64(buf),pars,mapa:lmDxDetectar(pars)};
+   it.campos=it.dx.mapa.length;it.estado=it.campos?'pronto':'semcampo';
+  }catch(e){it.estado='erro';it.erro=e.message||String(e);it.dx=null}
+  render()}
+ const ok=LM.lote.filter(x=>x.estado==='pronto').length,ruim=LM.lote.filter(x=>x.estado==='erro').length;
+ toast((ok===1?'1 documento lido.':ok+' documentos lidos.')+(ruim?(ruim===1?' 1 não deu certo.':' '+ruim+' não deram certo.'):'')+' Confira o tipo e a área antes de salvar.')}
+function lmLoteTela(){const L=LM.lote;
+ const est={fila:'Na fila',lendo:'Lendo o arquivo...',pronto:'Pronto para salvar',semcampo:'Nenhum campo reconhecido',erro:'Não foi possível ler'};
+ const prontos=L.filter(x=>x.estado==='pronto'||x.estado==='semcampo').length;
+ return `<div class="panel"><h2>Envio de vários modelos</h2>
+ <p class="sub">${L.length===1?'1 arquivo':L.length+' arquivos'} na lista${LM.org?', indo para o escritório <b>'+esc(LM.org.nome)+'</b>':''}. O sistema lê cada Word, guarda a fonte, o cabeçalho, o rodapé, o timbre e a marca d'água, e marca sozinho os trechos que mudam de cliente para cliente. O tipo e a área vêm adivinhados pelo nome do arquivo, então confira linha por linha antes de salvar.</p>
+ ${L.map((it,i)=>`<div class="rec" style="align-items:flex-start;flex-wrap:wrap;gap:12px">
+  <div style="flex:1;min-width:240px"><b>${esc(it.f.name)}</b><br><small class="${it.estado==='erro'?'':'sub'}" style="${it.estado==='erro'?'color:var(--bad)':''}">${est[it.estado]||it.estado}${it.campos?' · '+it.campos+' campos reconhecidos':''}${it.erro?' · '+esc(it.erro):''}</small>
+   <div class="f" style="margin-top:8px"><label>Nome do modelo</label><input value="${esc(it.nome)}" oninput="LM.lote[${i}].nome=this.value"></div></div>
+  <div style="min-width:210px">
+   <div class="f"><label>Documento</label><select onchange="LM.lote[${i}].tipo=this.value">${Object.entries(LM_DOCS).map(([k,n])=>`<option value="${k}" ${it.tipo===k?'selected':''}>${n}</option>`).join('')}</select></div>
+   <div class="f" style="margin-top:8px"><label>Área</label><select onchange="LM.lote[${i}].area=this.value"><option value="todas" ${it.area==='todas'?'selected':''}>Todas as áreas</option>${Object.entries(LM_AREAS).map(([k,n])=>`<option value="${k}" ${it.area===k?'selected':''}>${n}</option>`).join('')}</select></div></div>
+  <div style="display:flex;flex-direction:column;gap:8px">${it.dx?`<button class="btn3" onclick="lmLoteAbrir(${i})">Conferir campos</button>`:''}<button class="btn3" style="color:var(--bad)" onclick="lmLoteTirar(${i})">Tirar da lista</button></div>
+ </div>`).join('')}
+ <div class="acts"><button class="btn2" onclick="LM.lote=null;render()">Cancelar tudo</button><button class="btn" ${prontos?'':'disabled'} onclick="lmLoteSalvar(this)">Salvar ${prontos===1?'1 modelo':prontos+' modelos'}</button></div></div>`}
+function lmLoteTirar(i){LM.lote.splice(i,1);if(!LM.lote.length)LM.lote=null;render()}
+function lmLoteAbrir(i){const it=LM.lote[i];if(!it.dx)return;
+ LM.mod={tipo:it.tipo,area:it.area,nome:it.nome,texto:'',dx:JSON.parse(JSON.stringify(it.dx))};
+ LM.lote.splice(i,1);if(!LM.lote.length)LM.lote=null;render()}
+async function lmLoteSalvar(b){const L=LM.lote.filter(x=>x.estado==='pronto'||x.estado==='semcampo');
+ if(!L.length){toast('Nenhum documento pronto para salvar.');return}
+ const sem=L.filter(x=>!x.campos).length;
+ if(sem&&!confirm((sem===1?'1 documento ficou':sem+' documentos ficaram')+' sem nenhum campo reconhecido. '+(sem===1?'Ele será salvo':'Eles serão salvos')+' do jeito que está, sem preenchimento automático. Continuar?'))return;
+ b.disabled=true;const t0=b.textContent;let ok=0;const falhou=[];
+ for(let i=0;i<L.length;i++){const it=L[i];b.textContent='Salvando '+(i+1)+' de '+L.length+'...';
+  const row={tipo:it.tipo,area:it.area,nome:(it.nome||'').trim()||it.f.name,texto:LM_DX+JSON.stringify(it.dx),ativo:true,versao:1,enviado_por:U.user.id};
+  if(LM.org)row.escritorio_id=LM.org.id;
+  const r=await SB.from('lm_modelos').insert(row).select('id').single();
+  if(r.error)falhou.push(it.f.name+': '+r.error.message);else{ok++;it.estado='salvo'}}
+ b.disabled=false;b.textContent=t0;
+ LM.lote=LM.lote.filter(x=>x.estado!=='salvo');if(!LM.lote.length)LM.lote=null;
+ await lmCarregar(true);render();
+ toast(falhou.length?ok+' salvos. Não deu certo em '+falhou.length+': '+falhou[0]:(ok===1?'1 modelo salvo':ok+' modelos salvos')+' na biblioteca do escritório.')}
+
 /* ---------- Modelos do escritório ---------- */
-function lmModelos(){if(LM.mod)return lmEditor();const G={};LM.modelos.forEach(m=>{(G[m.tipo]=G[m.tipo]||[]).push(m)});
+function lmModelos(){if(LM.lote)return lmLoteTela();if(LM.mod)return lmEditor();const G={};LM.modelos.forEach(m=>{(G[m.tipo]=G[m.tipo]||[]).push(m)});
  return `<div class="panel"><h2>Modelos do escritório</h2><p class="sub">Envie a procuração ou o contrato do escritório em Word (.docx). O sistema reconhece sozinho o nome, o CPF, o RG, a nacionalidade, o estado civil, a profissão, o endereço, o local e a data, e liga cada trecho ao cadastro. O documento sai com a fonte, o cabeçalho, o rodapé, o timbre e a marca d'água do próprio arquivo. Sem modelo próprio, o LexMandato usa o modelo padrão.</p>
  <div class="acts" style="justify-content:flex-start"><button class="btn" onclick="lmNovoModelo()">+ Novo modelo</button></div>
  ${Object.keys(LM_DOCS).map(t=>`<h3>${LM_DOCS[t]}</h3>${(G[t]||[]).map(m=>`<div class="rec"><div><b>${esc(m.nome)}</b><br><small>${m.area==='todas'?'Todas as áreas':LM_AREAS[m.area]} · versão ${m.versao} · ${br((m.criado_em||'').slice(0,10))}</small></div><div style="display:flex;gap:8px"><button class="btn2" onclick="lmEditarModelo('${m.id}')">Editar</button><button class="btn3" style="color:var(--bad)" onclick="lmArquivarModelo('${m.id}')">Arquivar</button></div></div>`).join('')||'<p class="sub">Usando o modelo padrão LexMandato.</p>'}`).join('')}</div>`}
@@ -409,7 +559,7 @@ async function lmImportar(f){if(!f)return;try{let txt='';
  LM.mod.texto=L.join('\n');if(!LM.mod.nome)LM.mod.nome=f.name.replace(/\.\w+$/,'');render();toast('Texto importado. Agora marque os campos variáveis.')}catch(e){toast(e.message||'Não foi possível ler o arquivo.')}}
 async function lmSalvarModelo(){const m=LM.mod;if(!m.nome.trim()){toast('Dê um nome ao modelo.');return}if(!m.dx&&!m.texto.trim()){toast('O modelo está vazio.');return}
  if(m.dx){m.dx.mapa=m.dx.mapa.filter(x=>x.de&&x.campo);if(!m.dx.mapa.length){toast('Marque pelo menos um campo variável.');return}}
- const row={tipo:m.tipo,area:m.area,nome:m.nome.trim(),texto:m.dx?LM_DX+JSON.stringify(m.dx):m.texto,ativo:true,versao:m.id?(m.versao||1)+1:1};if(m.grupo)row.grupo=m.grupo;
+ const row={tipo:m.tipo,area:m.area,nome:m.nome.trim(),texto:m.dx?LM_DX+JSON.stringify(m.dx):m.texto,ativo:true,versao:m.id?(m.versao||1)+1:1};if(m.grupo)row.grupo=m.grupo;if(LM.org)row.escritorio_id=LM.org.id;row.enviado_por=U.user.id;
  const r=await SB.from('lm_modelos').insert(row).select('*').single();if(r.error){toast('Não foi possível salvar: '+r.error.message);return}
  if(m.id)await SB.from('lm_modelos').update({ativo:false}).eq('id',m.id);
  if(LM.doc&&LM.doc.modelos)Object.keys(LM.doc.modelos).forEach(k=>{if(LM.doc.modelos[k]===m.id)LM.doc.modelos[k]=r.data.id});
