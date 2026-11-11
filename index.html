@@ -82,7 +82,7 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 <script src="/cliques.js" data-modo="app" defer></script></head>
 <body>
 <div id="app"></div>
-<script src="mandato.js?v=7"></script>
+<script src="mandato.js?v=8"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const SB=supabase.createClient('https://blszdbjpxgtloblxlusr.supabase.co','sb_publishable_0Tns_mDN2N1iQmw_sEzFXw_SRMy1uXK');
@@ -207,7 +207,7 @@ const OPT_JUR=`<option value="auto">Juros legais (0,5% até 01/2003, 1% até 08/
 /* ============ Tela ============ */
 function topo(){const it=[['inicio','Início'],['meus','Meus cálculos'],['mandato','LexMandato'],['assinar','Assinatura'],['config','Configurações'],['ajuda','Ajuda']];
  return `<div class="top"><div class="logo" onclick="ir('inicio')"><img src="assets/icone.png" alt=""><span>Lex <b>Calc</b></span></div><div class="nav">${it.map(([k,t])=>`<button class="${U.view===k?'on':''}" onclick="ir('${k}')">${t}</button>`).join('')}</div><div class="usr"><button class="btn3 atu" id="btnAtu" title="Procurar atualização do sistema" onclick="procurarAtualizacao(this)">${ICO_ATU} Procurar atualização</button><span class="eml">${esc(U.user?U.user.email:'')}</span><button class="btn3" onclick="sair()">Sair</button></div></div>`}
-const VERSAO_LEX='1.5.0';
+const VERSAO_LEX='1.6.0';
 const ICO_ATU='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>';
 async function procurarAtualizacao(btn){if(btn)btn.classList.add('gira');
  try{const r=await fetch('versao.json?t='+Date.now(),{cache:'no-store'});const j=await r.json();const v=String(j.versao||'').replace(/^v/i,'');
@@ -521,10 +521,10 @@ function vConfig(){const p=pref();const u=U.user;
   <label class="btn2" style="cursor:pointer">Outro documento, você escolhe o tipo<input type="file" accept=".docx,.doc,.pdf,.txt" style="display:none" onchange="cfgModelo(this,'declaracao')"></label>
  </div>
  <h3>Enviar vários de uma vez</h3>
- <p class="sub">Tem a pasta inteira de modelos do escritório? Selecione todos os arquivos .docx de uma vez. O sistema lê um por um, adivinha pelo nome do arquivo se é procuração, contrato, declaração ou substabelecimento, e de que área é, e mostra a lista para você conferir antes de gravar.</p>
- <div class="acts" style="justify-content:flex-start;margin-top:10px"><label class="btn2" style="cursor:pointer">Selecionar vários modelos<input type="file" accept=".docx" multiple style="display:none" onchange="cfgLote(this)"></label></div>
+ <p class="sub">Tem as pastas inteiras de modelos do escritório, separadas por área? Mande tudo de uma vez. O sistema lê arquivo por arquivo, usa o nome da pasta para saber a área, adivinha pelo nome do arquivo se é procuração, contrato, declaração ou substabelecimento, e mostra a lista inteira para você conferir antes de gravar. Para enviar área por área, use a aba Biblioteca, que tem um botão próprio para Previdenciário, Trabalhista, Cível e Geral.</p>
+ <div class="acts" style="justify-content:flex-start;margin-top:10px"><label class="btn2" style="cursor:pointer">Selecionar arquivos<input type="file" accept=".docx" multiple style="display:none" onchange="cfgLote(this)"></label><label class="btn2" style="cursor:pointer">Selecionar pastas inteiras<input type="file" accept=".docx" webkitdirectory directory multiple style="display:none" onchange="cfgLote(this)"></label></div>
  <p class="sub" style="margin-top:10px">${cfgModelosResumo()}</p>
- <div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="ir('mandato');LM.tab='modelos';render()">Ver todos os modelos</button></div></div>
+ <div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="ir('mandato');LM.tab='modelos';render()">Abrir a Biblioteca</button></div></div>
  <div class="panel"><h2 style="margin-top:0">Padrões de cálculo</h2><p class="sub">Já vêm preenchidos em todo cálculo novo. Você pode mudar em cada cálculo.</p><div class="f" style="margin:12px 0 10px"><label>Tabela ou índice padrão</label><select id="pInd">${OPT_IND}</select></div><div class="f" style="margin-bottom:10px"><label>Juros padrão</label><select id="pJur">${OPT_JUR}</select></div><div class="f"><label>Honorários de sucumbência padrão (%)</label><input id="pHon" value="${esc(String(p.honorarios||'0'))}"></div>
  <div class="acts"><button class="btn" onclick="salvarPref()">Salvar configurações</button></div></div>
  </div></div>`}

@@ -1,4 +1,4 @@
 {
-  "versao": "1.5.0",
-  "novidades": "Os modelos, os clientes e os documentos do LexMandato passam a pertencer ao escritório, e não ao login. Cada pessoa cria o acesso dela e entra com um código de convite, sem dividir senha. As Configurações ganharam o painel de escritório e equipe e o envio de vários modelos de uma vez."
+  "versao": "1.6.0",
+  "novidades": "Login mestre da BlackSolutions, com a aba Administração para criar escritórios, alimentar a biblioteca de cada um e gerar o código de acesso do responsável. A aba Modelos virou Biblioteca, separada em Previdenciário, Trabalhista, Cível e Geral, com envio de pastas inteiras do computador de uma vez."
 }
