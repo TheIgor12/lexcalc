@@ -1,4 +1,4 @@
 {
-  "versao": "1.6.0",
-  "novidades": "Login mestre da BlackSolutions, com a aba Administração para criar escritórios, alimentar a biblioteca de cada um e gerar o código de acesso do responsável. A aba Modelos virou Biblioteca, separada em Previdenciário, Trabalhista, Cível e Geral, com envio de pastas inteiras do computador de uma vez."
+  "versao": "1.6.1",
+  "novidades": "Cada documento da Biblioteca ganhou o botão Preencher e gerar, que abre o formulário já com aquele modelo escolhido, na área certa, para preencher os dados do cliente e baixar em PDF ou no Word do próprio escritório."
 }
