@@ -1,4 +1,4 @@
 {
-  "versao": "1.6.1",
-  "novidades": "Cada documento da Biblioteca ganhou o botão Preencher e gerar, que abre o formulário já com aquele modelo escolhido, na área certa, para preencher os dados do cliente e baixar em PDF ou no Word do próprio escritório."
+  "versao": "1.7.0",
+  "novidades": "A Biblioteca lê os modelos em Word .docx e .dotx pelos nomes dos próprios campos do escritório, separa os arquivos repetidos na área Duplicados repetidos e abre cada documento em uma janela de preenchimento, com os campos que aquele documento pede, conferência do texto, impressão e download em Word."
 }

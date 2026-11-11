@@ -9,7 +9,32 @@ const LM_TRAB=['Reclamação trabalhista pelo rito ordinário','Reclamação tra
 const LM_BENEF=['Aposentadoria por idade','Aposentadoria por tempo de contribuição','Aposentadoria especial','Aposentadoria da pessoa com deficiência','Aposentadoria por incapacidade permanente','Auxílio por incapacidade temporária','Auxílio-acidente','Benefício de prestação continuada à pessoa idosa','Benefício de prestação continuada à pessoa com deficiência','Pensão por morte','Auxílio-reclusão','Salário-maternidade','Revisão de benefício','Restabelecimento de benefício','Certidão de tempo de contribuição','Outro, descrito no objeto'];
 const LM_ESTCIVIL=[['solteiro','solteiro(a)'],['casado','casado(a)'],['uniao','em união estável'],['divorciado','divorciado(a)'],['separado','separado(a) judicialmente'],['viuvo','viúvo(a)']];
 const LM_STATUS=['Rascunho','Em revisão','Aprovado','Gerado','Aguardando assinatura','Assinado','Cancelado','Revogação registrada'];
-const LM_DOCS={procuracao:'Procuração',declaracao:'Declaração de hipossuficiência',contrato:'Contrato de honorários',substabelecimento:'Substabelecimento',preposicao:'Carta de preposição',termo_inss:'Termo de responsabilidade (INSS)'};
+const LM_DOCS={
+ procuracao:'Procura\u00e7\u00e3o',
+ substab_com:'Substabelecimento com reserva de poderes',
+ substab_sem:'Substabelecimento sem reserva de poderes',
+ substabelecimento:'Substabelecimento',
+ revogacao:'Revoga\u00e7\u00e3o de procura\u00e7\u00e3o',
+ renuncia_mandato:'Comunica\u00e7\u00e3o de ren\u00fancia de mandato',
+ contrato:'Contrato de honor\u00e1rios',
+ rescisao_contrato:'Termo de rescis\u00e3o de contrato de honor\u00e1rios',
+ preposicao:'Carta de preposi\u00e7\u00e3o',
+ declaracao:'Declara\u00e7\u00e3o de hipossufici\u00eancia',
+ decl_endereco:'Declara\u00e7\u00e3o de endere\u00e7o',
+ decl_sem_advogado:'Declara\u00e7\u00e3o de aus\u00eancia de contrata\u00e7\u00e3o de advogado',
+ autorizacao_senha:'Autoriza\u00e7\u00e3o de uso de senha do gov.br',
+ renuncia_valores:'Termo de ren\u00fancia de valores excedentes',
+ termo_inss:'Termo de responsabilidade (INSS)',
+ devolucao_docs:'Termo de devolu\u00e7\u00e3o de documentos',
+ requerimento:'Requerimento'};
+/* Grupos, que \u00e9 como o advogado procura o documento na hora de trabalhar */
+const LM_GRUPOS=[
+ ['Mandato',['procuracao','substab_com','substab_sem','substabelecimento','revogacao','renuncia_mandato']],
+ ['Contrata\u00e7\u00e3o',['contrato','rescisao_contrato','preposicao']],
+ ['Declara\u00e7\u00f5es do cliente',['declaracao','decl_endereco','decl_sem_advogado','autorizacao_senha','renuncia_valores','termo_inss']],
+ ['Controle interno',['devolucao_docs']],
+ ['Peti\u00e7\u00f5es e requerimentos',['requerimento']]];
+function lmGrupoDe(tipo){const g=LM_GRUPOS.find(([,L])=>L.indexOf(tipo)>=0);return g?g[0]:'Outros'}
 /* Poderes do art. 105 do CPC, cada um em separado */
 const LM_ESPECIAIS=[['citacao','Receber citação','Recebe a citação no lugar do cliente. O prazo começa a correr a partir daí.','receber citação'],
  ['confessar','Confessar','Admite como verdadeiro um fato contrário ao interesse do cliente.','confessar'],
@@ -498,14 +523,45 @@ async function lmMestreRenomear(id){const e=(LM.todosEsc||[]).find(x=>x.id===id)
  if(error){toast(lmErroSql(error));return}
  LM.carregado=false;await lmCarregar(true);render();toast('Nome alterado.')}
 
-/* ---------- Envio de vários modelos de uma vez ---------- */
-function lmAdivTipo(n){const x=String(n||'').toLowerCase();
- if(/substabel/.test(x))return 'substabelecimento';
+/* L\u00ea um Word de modelo (.docx ou .dotx), achata os controles de conte\u00fado e
+   devolve a estrutura que o LexMandato guarda. */
+async function lmDxLer(f,tipo){
+ if(/\.doc$/i.test(f.name))throw new Error('Arquivo .doc antigo. Abra no Word, use Salvar como e escolha .docx.');
+ if(!/\.(docx|dotx)$/i.test(f.name))throw new Error('Envie em Word .docx ou .dotx. S\u00f3 esses formatos guardam o timbre e a marca d\'\u00e1gua.');
+ if(f.size>12*1048576)throw new Error('Passa de 12 MB. Reduza as imagens do timbre e envie de novo.');
+ const buf=await f.arrayBuffer();const r=await lmDxAbrir(new Uint8Array(buf));
+ const h=lmHashBytes(buf);
+ const achados=lmDxAchatar(r.dom);
+ let b64;
+ if(achados.length){r.zip.file('word/document.xml',new XMLSerializer().serializeToString(r.dom),{date:new Date(Date.UTC(2020,0,1))});
+  const saida=await r.zip.generateAsync({type:'uint8array',compression:'DEFLATE'});b64=lmB64(saida.buffer)}
+ else b64=lmB64(buf);
+ const pars=lmDxPars(r.dom);
+ return {arquivo:f.name,b64,h,pars,mapa:lmDxDetectar(pars,achados,tipo),sdt:achados.length,fontes:lmDxTemFontes(r.zip)}}
+/* impressão digital do arquivo original, para achar os repetidos */
+function lmHashBytes(buf){const u=new Uint8Array(buf);let a=5381,b=52711;
+ for(let i=0;i<u.length;i++){a=((a*33)^u[i])>>>0;b=((b*31)+u[i])>>>0}
+ return a.toString(36)+b.toString(36)+'_'+u.length}
+function lmDxTemFontes(zip){try{return Object.keys(zip.files).filter(n=>/^word\/fonts\/.+\.odttf$/i.test(n)).length}catch(e){return 0}}
+
+/* ---------- Envio de v\u00e1rios modelos de uma vez ---------- */
+function lmAdivTipo(n){const x=lmSemAcento(n);
+ if(/revoga/.test(x))return 'revogacao';
+ if(/renuncia de mandato|renuncia ao mandato/.test(x))return 'renuncia_mandato';
+ if(/valores excedentes|renuncia de valores/.test(x))return 'renuncia_valores';
+ if(/rescis/.test(x))return 'rescisao_contrato';
+ if(/devoluc/.test(x))return 'devolucao_docs';
+ if(/senha|gov ?\.? ?br/.test(x))return 'autorizacao_senha';
+ if(/substabe/.test(x))return /com reserva/.test(x)?'substab_com':(/sem reserva/.test(x)?'substab_sem':'substabelecimento');
  if(/preposi|preposto/.test(x))return 'preposicao';
- if(/hipossuf|declara/.test(x))return 'declaracao';
- if(/termo.*(inss|responsab)|responsab.*inss/.test(x))return 'termo_inss';
- if(/contrato|honor/.test(x))return 'contrato';
- if(/procura/.test(x))return 'procuracao';
+ if(/hipossufici|declaracao de pobreza|gratuidade/.test(x))return 'declaracao';
+ if(/ausencia de contrata|sem advogado|nao contratou/.test(x))return 'decl_sem_advogado';
+ if(/endereco/.test(x))return 'decl_endereco';
+ if(/requerimento|peticao/.test(x))return 'requerimento';
+ if(/responsabilidade.*inss|inss.*responsabilidade/.test(x))return 'termo_inss';
+ if(/contrato|honorar/.test(x))return 'contrato';
+ if(/procurac/.test(x))return 'procuracao';
+ if(/declarac|termo/.test(x))return 'declaracao';
  return 'procuracao'}
 function lmAdivArea(n){const x=String(n||'').toLowerCase();
  if(/previden|inss|aposentad|bpc|loas|aux[ií]lio|benef[ií]c|pens[aã]o|rural/.test(x))return 'previdenciario';
@@ -513,7 +569,7 @@ function lmAdivArea(n){const x=String(n||'').toLowerCase();
  if(/c[ií]vel|civil|consumidor|banc[aá]r|revision|indeniza/.test(x))return 'civel';
  return 'todas'}
 async function cfgLote(inp,areaFixa){let fs=[].slice.call(inp.files||[]);inp.value='';
- fs=fs.filter(f=>/\.docx?$/i.test(f.name)&&!/^~\$/.test(f.name));
+ fs=fs.filter(f=>/\.(docx|dotx)$/i.test(f.name)&&!/^~\$/.test(f.name));
  if(!fs.length){toast('Nenhum arquivo do Word encontrado na seleção.');return}
  if(fs.length>60){toast('São '+fs.length+' arquivos. Envie em partes de até 60 por vez.');return}
  U.view='mandato';LM.tab='modelos';LM.mod=null;LM.semDx=false;
@@ -526,37 +582,49 @@ async function lmLoteLer(){if(!LM.lote)return;
  for(let i=0;i<LM.lote.length;i++){const it=LM.lote[i];if(it.estado!=='fila')continue;
   it.estado='lendo';render();
   try{
-   if(/\.doc$/i.test(it.f.name))throw new Error('Arquivo .doc antigo. Abra no Word, use Salvar como e escolha .docx.');
-   if(!/\.docx$/i.test(it.f.name))throw new Error('Envie em Word .docx. Só esse formato guarda o timbre e a marca d\'água.');
-   if(it.f.size>2.6*1048576)throw new Error('Passa de 2,6 MB. Reduza as imagens do timbre e envie de novo.');
-   const buf=await it.f.arrayBuffer();const r=await lmDxAbrir(new Uint8Array(buf));const pars=lmDxPars(r.dom);
-   it.dx={arquivo:it.f.name,b64:lmB64(buf),pars,mapa:lmDxDetectar(pars)};
-   it.campos=it.dx.mapa.length;it.estado=it.campos?'pronto':'semcampo';
+   it.dx=await lmDxLer(it.f,it.tipo);
+   it.campos=it.dx.mapa.length;it.semCampo=it.dx.mapa.filter(x=>!x.campo).length;
+   it.estado=it.campos?'pronto':'semcampo';
    const nm=(it.nome||'').trim().toLowerCase();
    it.repetido=LM.modelos.some(m=>String(m.nome||'').trim().toLowerCase()===nm&&m.tipo===it.tipo&&(m.area||'todas')===it.area);
   }catch(e){it.estado='erro';it.erro=e.message||String(e);it.dx=null}
   render()}
+ lmLoteDedup();
  const ok=LM.lote.filter(x=>x.estado==='pronto').length,ruim=LM.lote.filter(x=>x.estado==='erro').length;
  toast((ok===1?'1 documento lido.':ok+' documentos lidos.')+(ruim?(ruim===1?' 1 não deu certo.':' '+ruim+' não deram certo.'):'')+' Confira o tipo e a área antes de salvar.')}
+/* Arquivos iguais em pastas diferentes: guarda um só e manda os que sobram
+   para a área Duplicados repetidos, sem gravar o arquivo de novo. */
+function lmHash(t){let h=5381;for(let i=0;i<t.length;i++)h=((h*33)^t.charCodeAt(i))>>>0;return h.toString(36)+'_'+t.length}
+function lmLoteDedup(){if(!LM.lote)return;
+ const g={};LM.lote.forEach(it=>{if(!it.dx||it.estado==='erro')return;it.hash=it.dx.h||lmHash(it.dx.b64);(g[it.hash]=g[it.hash]||[]).push(it)});
+ Object.keys(g).forEach(h=>{const L=g[h];if(L.length<2)return;
+  const areas=[];L.forEach(x=>{if(areas.indexOf(x.area)<0)areas.push(x.area)});
+  const p=L[0];p.copias=L.length;p.areasOrig=areas.slice();
+  if(areas.length>1)p.area='todas';
+  L.slice(1).forEach(x=>{x.area='duplicados';x.estado='duplicado';x.copiaDe=p.nome;x.dx=null;x.campos=0;x.semCampo=0})})}
 function lmLoteTela(){const L=LM.lote;
- const est={fila:'Na fila',lendo:'Lendo o arquivo...',pronto:'Pronto para salvar',semcampo:'Nenhum campo reconhecido',erro:'Não foi possível ler'};
+ const est={fila:'Na fila',lendo:'Lendo o arquivo...',pronto:'Pronto para salvar',semcampo:'Nenhum campo reconhecido',erro:'Não foi possível ler',duplicado:'Repetido, vai para Duplicados repetidos'};
  const prontos=L.filter(x=>x.estado==='pronto'||x.estado==='semcampo').length;
+ const dup=L.filter(x=>x.estado==='duplicado').length;
+ const avisoDup=dup?`<div class="notice" style="margin:12px 0"><b>${dup===1?'1 arquivo repetido':dup+' arquivos repetidos'}.</b> Arquivos exatamente iguais apareceram em mais de uma pasta. O sistema guarda um só, na área que serve para todas, e manda os que sobram para a área <b>Duplicados repetidos</b>, apenas como registro, sem gravar o arquivo de novo. Assim a biblioteca não fica com o mesmo documento três vezes e uma correção futura vale para todos.</div>`:'';
  return `<div class="panel"><h2>Envio de vários modelos</h2>
  <p class="sub">${L.length===1?'1 arquivo':L.length+' arquivos'} na lista${LM.org?', indo para o escritório <b>'+esc(LM.org.nome)+'</b>':''}. O sistema lê cada Word, guarda a fonte, o cabeçalho, o rodapé, o timbre e a marca d'água, e marca sozinho os trechos que mudam de cliente para cliente. O tipo e a área vêm adivinhados pelo nome do arquivo, então confira linha por linha antes de salvar.</p>
+ ${avisoDup}
  ${L.map((it,i)=>`<div class="rec" style="align-items:flex-start;flex-wrap:wrap;gap:12px">
-  <div style="flex:1;min-width:240px"><b>${esc(it.f.name)}</b>${it.pasta?`<br><small class="sub">pasta ${esc(it.pasta)}</small>`:''}<br><small class="${it.estado==='erro'?'':'sub'}" style="${it.estado==='erro'?'color:var(--bad)':''}">${est[it.estado]||it.estado}${it.campos?' · '+it.campos+' campos reconhecidos':''}${it.erro?' · '+esc(it.erro):''}</small>${it.repetido?'<br><small style="color:var(--gold)">Já existe um modelo com este nome, tipo e área na biblioteca. Salvar de novo cria um segundo.</small>':''}
+  <div style="flex:1;min-width:240px"><b>${esc(it.f.name)}</b>${it.pasta?`<br><small class="sub">pasta ${esc(it.pasta)}</small>`:''}<br><small class="${it.estado==='erro'?'':'sub'}" style="${it.estado==='erro'?'color:var(--bad)':''}">${est[it.estado]||it.estado}${it.campos?' · '+it.campos+' campos reconhecidos'+(it.dx&&it.dx.sdt?', pelos nomes do próprio modelo':''):''}${it.erro?' · '+esc(it.erro):''}</small>${it.semCampo?`<br><small style="color:var(--gold)">${it.semCampo===1?'1 campo sem ligação':it.semCampo+' campos sem ligação'} com o cadastro. Abra em Conferir campos para escolher.</small>`:''}${it.repetido?'<br><small style="color:var(--gold)">Já existe um modelo com este nome, tipo e área na biblioteca. Salvar de novo cria um segundo.</small>':''}${it.estado==='duplicado'?`<br><small style="color:var(--gold)">Igual a <b>${esc(it.copiaDe||'')}</b>, que vai ser guardado. Esta cópia fica só como registro.</small>`:''}${it.copias?`<br><small style="color:var(--gold)">Este mesmo arquivo veio em ${it.copias} pastas (${esc((it.areasOrig||[]).map(a=>a==='todas'?'sem área':(LM_AREAS[a]||a)).join(', '))}). Guardado uma vez só.</small>`:''}
    <div class="f" style="margin-top:8px"><label>Nome do modelo</label><input value="${esc(it.nome)}" oninput="LM.lote[${i}].nome=this.value"></div></div>
   <div style="min-width:210px">
    <div class="f"><label>Documento</label><select onchange="LM.lote[${i}].tipo=this.value">${Object.entries(LM_DOCS).map(([k,n])=>`<option value="${k}" ${it.tipo===k?'selected':''}>${n}</option>`).join('')}</select></div>
    <div class="f" style="margin-top:8px"><label>Área</label><select onchange="LM.lote[${i}].area=this.value"><option value="todas" ${it.area==='todas'?'selected':''}>Todas as áreas</option>${Object.entries(LM_AREAS).map(([k,n])=>`<option value="${k}" ${it.area===k?'selected':''}>${n}</option>`).join('')}</select></div></div>
   <div style="display:flex;flex-direction:column;gap:8px">${it.dx?`<button class="btn3" onclick="lmLoteAbrir(${i})">Conferir campos</button>`:''}<button class="btn3" style="color:var(--bad)" onclick="lmLoteTirar(${i})">Tirar da lista</button></div>
  </div>`).join('')}
- <div class="acts"><button class="btn2" onclick="LM.lote=null;render()">Cancelar tudo</button><button class="btn" ${prontos?'':'disabled'} onclick="lmLoteSalvar(this)">Salvar ${prontos===1?'1 modelo':prontos+' modelos'}</button></div></div>`}
+ <div class="acts"><button class="btn2" onclick="LM.lote=null;render()">Cancelar tudo</button><button class="btn" ${prontos?'':'disabled'} onclick="lmLoteSalvar(this)">Salvar ${prontos===1?'1 modelo':prontos+' modelos'}${dup?' e registrar '+dup+' duplicados':''}</button></div></div>`}
 function lmLoteTirar(i){LM.lote.splice(i,1);if(!LM.lote.length)LM.lote=null;render()}
 function lmLoteAbrir(i){const it=LM.lote[i];if(!it.dx)return;
  LM.mod={tipo:it.tipo,area:it.area,nome:it.nome,texto:'',dx:JSON.parse(JSON.stringify(it.dx))};
  LM.lote.splice(i,1);if(!LM.lote.length)LM.lote=null;render()}
 async function lmLoteSalvar(b){const L=LM.lote.filter(x=>x.estado==='pronto'||x.estado==='semcampo');
+ const DUP=LM.lote.filter(x=>x.estado==='duplicado');
  if(!L.length){toast('Nenhum documento pronto para salvar.');return}
  const rep=L.filter(x=>x.repetido).length;
  if(rep&&!confirm((rep===1?'1 documento já existe':rep+' documentos já existem')+' na biblioteca com o mesmo nome, tipo e área. Salvar agora cria cópia. Continuar assim mesmo?'))return;
@@ -568,27 +636,41 @@ async function lmLoteSalvar(b){const L=LM.lote.filter(x=>x.estado==='pronto'||x.
   if(LM.org)row.escritorio_id=LM.org.id;
   const r=await SB.from('lm_modelos').insert(row).select('id').single();
   if(r.error)falhou.push(it.f.name+': '+r.error.message);else{ok++;it.estado='salvo'}}
+ /* os repetidos ficam só como registro, sem o arquivo */
+ for(let i=0;i<DUP.length;i++){const it=DUP[i];b.textContent='Registrando duplicado '+(i+1)+' de '+DUP.length+'...';
+  const row={tipo:it.tipo,area:'duplicados',nome:(it.nome||'').trim()||it.f.name,
+   texto:LM_COPIA+JSON.stringify({arquivo:it.f.name,pasta:it.pasta||'',copia_de:it.copiaDe||''}),
+   ativo:true,versao:1,enviado_por:U.user.id};
+  if(LM.org)row.escritorio_id=LM.org.id;
+  const r=await SB.from('lm_modelos').insert(row).select('id').single();
+  if(!r.error)it.estado='salvo'}
  b.disabled=false;b.textContent=t0;
  LM.lote=LM.lote.filter(x=>x.estado!=='salvo');if(!LM.lote.length)LM.lote=null;
  await lmCarregar(true);render();
  toast(falhou.length?ok+' salvos. Não deu certo em '+falhou.length+': '+falhou[0]:(ok===1?'1 modelo salvo':ok+' modelos salvos')+' na biblioteca do escritório.')}
 
 /* ---------- Modelos do escritório ---------- */
-const LM_BIB=[['previdenciario','Previdenci\u00e1rio'],['trabalhista','Trabalhista'],['civel','C\u00edvel'],['todas','Geral, serve para qualquer \u00e1rea']];
+const LM_BIB=[['previdenciario','Previdenci\u00e1rio'],['trabalhista','Trabalhista'],['civel','C\u00edvel'],['todas','Geral, serve para qualquer \u00e1rea'],['duplicados','Duplicados repetidos']];
+const LM_COPIA='COPIA1:';
+function lmEhCopia(m){return !!(m&&typeof m.texto==='string'&&m.texto.startsWith(LM_COPIA))}
+function lmCopiaDados(m){try{return JSON.parse(m.texto.slice(LM_COPIA.length))}catch(e){return {}}}
 function lmModelos(){if(LM.lote)return lmLoteTela();if(LM.mod)return lmEditor();
- const tot=LM.modelos.length;
+ const tot=LM.modelos.filter(m=>(m.area||'todas')!=='duplicados').length;
  return `<div class="panel"><h2 style="margin-top:0">Biblioteca do escrit\u00f3rio${LM.org?' \u00b7 '+esc(LM.org.nome):''}</h2>
  <p class="sub">\u00c9 daqui que o LexMandato tira o modelo de cada documento. Envie os arquivos em Word (.docx) do jeito que o escrit\u00f3rio j\u00e1 usa. O sistema mant\u00e9m a fonte, o cabe\u00e7alho, o rodap\u00e9, o timbre e a marca d'\u00e1gua do pr\u00f3prio arquivo, reconhece sozinho o nome, o CPF, o RG, a nacionalidade, o estado civil, a profiss\u00e3o, o endere\u00e7o, o local e a data, e liga cada trecho ao cadastro do cliente. Onde n\u00e3o houver modelo pr\u00f3prio, o LexMandato usa o modelo padr\u00e3o.</p>
  <div class="notice" style="margin:12px 0">Cada \u00e1rea tem o pr\u00f3prio bot\u00e3o de envio logo abaixo. Use <b>Enviar a pasta inteira</b> para mandar de uma vez tudo o que estiver dentro de uma pasta do computador, como PREVIDENCIARIO, TRABALHISTA e C\u00cdVEL. Tudo o que voc\u00ea enviar por um bot\u00e3o entra na \u00e1rea daquele bot\u00e3o, e o tipo de cada documento vem adivinhado pelo nome do arquivo, para voc\u00ea conferir antes de gravar.</p>
  <div class="acts" style="justify-content:flex-start"><label class="btn2" style="cursor:pointer">Enviar v\u00e1rias pastas de uma vez<input type="file" accept=".docx" webkitdirectory directory multiple style="display:none" onchange="cfgLote(this)"></label><span class="sub" style="align-self:center">${tot===1?'1 modelo':tot+' modelos'} na biblioteca</span></div></div>
  ${LM_BIB.map(([k,n])=>lmBibArea(k,n)).join('')}`}
 function lmBibArea(k,n){const L=LM.modelos.filter(m=>(m.area||'todas')===k);const G={};L.forEach(m=>{(G[m.tipo]=G[m.tipo]||[]).push(m)});
+ if(k==='duplicados')return `<div class="panel"><h2 style="margin-top:0">${n} <span class="selo">${L.length}</span></h2>
+  <p class="sub">Arquivos que vieram repetidos, exatamente iguais, em mais de uma pasta. O documento bom está guardado nas áreas acima. Aqui fica só o registro de onde cada cópia veio, para ninguém achar que faltou alguma coisa. Nenhum arquivo foi gravado duas vezes.</p>
+  ${L.length?L.map(m=>{const c=lmCopiaDados(m);return `<div class="rec"><div><b>${esc(m.nome)}</b><br><small class="sub">${c.pasta?'pasta '+esc(c.pasta)+' · ':''}cópia de <b>${esc(c.copia_de||m.nome)}</b>, que está guardado nas áreas acima</small></div><div><button class="btn3" style="color:var(--bad)" onclick="lmArquivarModelo('${m.id}')">Apagar o registro</button></div></div>`}).join(''):'<p class="sub">Nenhum arquivo repetido até agora.</p>'}</div>`;
  return `<div class="panel"><h2 style="margin-top:0">${n} <span class="selo">${L.length}</span></h2>
  <div class="acts" style="justify-content:flex-start;margin-bottom:12px">
   <label class="btn" style="cursor:pointer">Enviar documentos<input type="file" accept=".docx" multiple style="display:none" onchange="cfgLote(this,'${k}')"></label>
   <label class="btn2" style="cursor:pointer">Enviar a pasta inteira<input type="file" accept=".docx" webkitdirectory directory multiple style="display:none" onchange="cfgLote(this,'${k}')"></label>
   <button class="btn3" onclick="lmNovoModelo('${k}')">Escrever um modelo</button></div>
- ${Object.keys(LM_DOCS).filter(t=>G[t]).map(t=>`<h3>${LM_DOCS[t]}</h3>${G[t].map(m=>`<div class="rec"><div><b>${esc(m.nome)}</b><br><small>vers\u00e3o ${m.versao} \u00b7 ${br((m.criado_em||'').slice(0,10))}${lmEhDocx(m)?' \u00b7 Word do escrit\u00f3rio':' \u00b7 texto'}</small></div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn" onclick="lmUsarModelo('${m.id}')">Preencher e gerar</button><button class="btn2" onclick="lmEditarModelo('${m.id}')">Editar</button><button class="btn3" style="color:var(--bad)" onclick="lmArquivarModelo('${m.id}')">Arquivar</button></div></div>`).join('')}`).join('')||'<p class="sub">Nenhum documento nesta \u00e1rea ainda.</p>'}</div>`}
+ ${Object.keys(LM_DOCS).filter(t=>G[t]).map(t=>`<h3>${LM_DOCS[t]}</h3>${G[t].map(m=>`<div class="rec"><div><b>${esc(m.nome)}</b><br><small>vers\u00e3o ${m.versao} \u00b7 ${br((m.criado_em||'').slice(0,10))}${lmEhDocx(m)?' \u00b7 Word do escrit\u00f3rio':' \u00b7 texto'}</small></div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn" onclick="lmAbrirPreenchimento('${m.id}')">Preencher e gerar</button><button class="btn2" onclick="lmEditarModelo('${m.id}')">Editar</button><button class="btn3" style="color:var(--bad)" onclick="lmArquivarModelo('${m.id}')">Arquivar</button></div></div>`).join('')}`).join('')||'<p class="sub">Nenhum documento nesta \u00e1rea ainda.</p>'}</div>`}
 function lmUsarModelo(id){const m=LM.modelos.find(x=>x.id===id);if(!m){toast('Modelo n\u00e3o encontrado.');return}
  const area=(m.area&&m.area!=='todas')?m.area:(LM.doc&&LM.doc.area)||'civel';
  const docs={procuracao:false,declaracao:false,contrato:false,substabelecimento:false,preposicao:false,termo_inss:false};docs[m.tipo]=true;
@@ -603,7 +685,7 @@ function lmEditor(){const m=LM.mod;
  <div class="fields">${`<div class="f s2"><label>Nome do modelo</label><input value="${esc(m.nome)}" oninput="LM.mod.nome=this.value" placeholder="Procuração cível do escritório"></div>`}
  <div class="f"><label>Documento</label><select onchange="LM.mod.tipo=this.value">${Object.entries(LM_DOCS).map(([k,n])=>`<option value="${k}" ${m.tipo===k?'selected':''}>${n}</option>`).join('')}</select></div>
  <div class="f"><label>Área</label><select onchange="LM.mod.area=this.value"><option value="todas">Todas as áreas</option>${Object.entries(LM_AREAS).map(([k,n])=>`<option value="${k}" ${m.area===k?'selected':''}>${n}</option>`).join('')}</select></div></div>
- <div class="acts" style="justify-content:flex-start"><label class="btn2" style="cursor:pointer">Importar Word ou PDF<input type="file" accept=".docx,.doc,.pdf,.txt" style="display:none" onchange="LM.semDx=false;lmImportar(this.files[0])"></label>${m.dx?'':'<button class="btn2" onclick="lmSugerir()">Sugerir campos</button>'}<button class="btn2" onclick="lmPadraoComCampos();render()">Começar do modelo padrão</button></div>
+ <div class="acts" style="justify-content:flex-start"><label class="btn2" style="cursor:pointer">Importar Word ou PDF<input type="file" accept=".docx,.dotx,.doc,.pdf,.txt" style="display:none" onchange="LM.semDx=false;lmImportar(this.files[0])"></label>${m.dx?'':'<button class="btn2" onclick="lmSugerir()">Sugerir campos</button>'}<button class="btn2" onclick="lmPadraoComCampos();render()">Começar do modelo padrão</button></div>
  ${m.dx?lmDxEditor():`<div class="lmrev" style="margin-top:14px"><div><div class="f"><label>Texto do modelo</label><textarea id="lmModTxt" rows="22" style="font-family:Georgia,serif;line-height:1.5" oninput="LM.mod.texto=this.value;lmModPreviewDeb()">${esc(m.texto)}</textarea><small class="sub">Use # no começo da linha para o título e **texto** para negrito. Selecione um trecho e clique em um campo ao lado para trocá-lo por um campo variável.</small></div></div>
  <div><b>Campos variáveis</b><div class="lmchips">${LM_CAMPOS.map(([k,n])=>`<button title="{{${k}}}" onclick="lmInserirCampo('${k}')">${n}</button>`).join('')}</div>
  <div id="lmModAviso"></div><div class="sub" style="margin:10px 0 4px">Teste com dados fictícios</div><div class="papel" id="lmModPrev"></div></div></div>`}
@@ -623,7 +705,9 @@ function lmSugerir(){let t=LM.mod.texto||'';const antes=t;t=t.replace(/\d{3}\.\d
 function lmCarregarScript(src,glob){if(window[glob])return Promise.resolve(window[glob]);return new Promise((ok,erro)=>{const s=document.createElement('script');s.src=src;s.onload=()=>ok(window[glob]);s.onerror=()=>erro(new Error('Não foi possível carregar o leitor de arquivos.'));document.head.appendChild(s)})}
 async function lmImportar(f){if(!f)return;try{let txt='';
  if(/\.doc$/i.test(f.name)){toast('Arquivo .doc antigo. Abra no Word, use Salvar como e escolha o formato .docx.');return}
- if(/\.docx$/i.test(f.name)&&!LM.semDx){if(f.size>2.6*1048576){toast('O arquivo passa de 2,6 MB. Reduza as imagens do timbre e envie de novo.');return}const buf=await f.arrayBuffer();const {dom}=await lmDxAbrir(new Uint8Array(buf));const pars=lmDxPars(dom);LM.mod.dx={arquivo:f.name,b64:lmB64(buf),pars,mapa:lmDxDetectar(pars)};LM.mod.texto='';if(!LM.mod.nome)LM.mod.nome=f.name.replace(/\.\w+$/,'');render();toast(LM.mod.dx.mapa.length+' campos reconhecidos. Confira a lista.');return}
+ if(/\.(docx|dotx)$/i.test(f.name)&&!LM.semDx){LM.mod.dx=await lmDxLer(f,LM.mod.tipo);LM.mod.texto='';if(!LM.mod.nome)LM.mod.nome=f.name.replace(/\.\w+$/,'');render();
+  const n=LM.mod.dx.mapa.length,v=LM.mod.dx.mapa.filter(x=>!x.campo).length;
+  toast(n+(n===1?' campo reconhecido':' campos reconhecidos')+(v?'. '+v+' sem liga\u00e7\u00e3o com o cadastro, escolha na lista.':'. Confira a lista.'));return}
  if(/\.docx$/i.test(f.name)){const m=await lmCarregarScript('assets/mammoth.browser.min.js','mammoth');const r=await m.extractRawText({arrayBuffer:await f.arrayBuffer()});txt=r.value}
  else if(/\.pdf$/i.test(f.name)){const pj=await lmCarregarScript('assets/pdfjs.min.js','pdfjsLib');pj.GlobalWorkerOptions.workerSrc='assets/pdfjs.worker.min.js';const doc=await pj.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
   for(let i=1;i<=doc.numPages;i++){const pg=await doc.getPage(i);const c=await pg.getTextContent();let y=null,linha='';const L=[];c.items.forEach(it=>{const yy=Math.round(it.transform[5]);if(y!==null&&Math.abs(yy-y)>3){L.push(linha);linha=''}linha+=it.str;y=yy});L.push(linha);txt+=L.join('\n')+'\n\n'}
@@ -682,10 +766,66 @@ function lmEhDocx(m){return !!(m&&typeof m.texto==='string'&&m.texto.startsWith(
 function lmDxDados(m){if(!m._dx){try{m._dx=JSON.parse(m.texto.slice(LM_DX.length))}catch(e){m._dx={b64:'',mapa:[],pars:[]}}}return m._dx}
 function lmB64(buf){let s='';const u=new Uint8Array(buf);for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s)}
 function lmDeB64(b){const s=atob(b);const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u}
-async function lmDxAbrir(u8){const JS=await lmCarregarScript('assets/jszip.min.js','JSZip');let zip;try{zip=await JS.loadAsync(u8)}catch(e){throw new Error('Não foi possível abrir o arquivo. Confira se é um Word no formato .docx.')}const f=zip.file('word/document.xml');if(!f)throw new Error('Este arquivo não é um Word válido (.docx).');const dom=new DOMParser().parseFromString(await f.async('string'),'application/xml');return {zip,dom}}
+async function lmDxAbrir(u8){const JS=await lmCarregarScript('assets/jszip.min.js','JSZip');let zip;try{zip=await JS.loadAsync(u8)}catch(e){throw new Error('Não foi possível abrir o arquivo. Confira se é um Word no formato .docx ou .dotx.')}const f=zip.file('word/document.xml');if(!f)throw new Error('Este arquivo não é um Word válido.');const dom=new DOMParser().parseFromString(await f.async('string'),'application/xml');return {zip,dom}}
 function lmDxPars(dom){return [...dom.getElementsByTagNameNS(W_NS,'p')].map(p=>[...p.getElementsByTagNameNS(W_NS,'t')].map(t=>t.textContent).join(''))}
+/* ---------- Controles de conte\u00fado do Word ----------
+   Muitos escrit\u00f3rios montam o modelo com controle de conte\u00fado, aquele campo que
+   mostra "Digite..." e tem nome pr\u00f3prio. O nome que o escrit\u00f3rio deu ao campo \u00e9
+   melhor que qualquer adivinha\u00e7\u00e3o nossa, ent\u00e3o a gente aproveita: troca cada
+   controle por uma marca leg\u00edvel, como \u00abNome\u00bb, e o resto do sistema segue igual. */
+function lmAtrW(el,nome){if(!el)return '';return el.getAttributeNS(W_NS,nome)||el.getAttribute('w:'+nome)||el.getAttribute(nome)||''}
+function lmDxAchatar(dom){const achados=[],usados={};
+ const sdts=[...dom.getElementsByTagNameNS(W_NS,'sdt')];
+ sdts.forEach(sdt=>{
+  if(!sdt.parentNode)return;
+  const cont=[...sdt.childNodes].filter(n=>n.localName==='sdtContent')[0];if(!cont)return;
+  if(cont.getElementsByTagNameNS(W_NS,'p').length)return;                 /* controle de bloco, n\u00e3o \u00e9 campo */
+  const pr=[...sdt.childNodes].filter(n=>n.localName==='sdtPr')[0];
+  const al=pr&&pr.getElementsByTagNameNS(W_NS,'alias')[0];
+  const tg=pr&&pr.getElementsByTagNameNS(W_NS,'tag')[0];
+  let nome=(lmAtrW(al,'val')||lmAtrW(tg,'val')||'Campo').trim().replace(/\s+/g,' ');
+  usados[nome]=(usados[nome]||0)+1;
+  const rot='\u00ab'+nome+(usados[nome]>1?' '+usados[nome]:'')+'\u00bb';
+  const ts=[...cont.getElementsByTagNameNS(W_NS,'t')];
+  if(!ts.length)return;
+  /* tira o realce cinza do espa\u00e7o reservado */
+  [...cont.getElementsByTagNameNS(W_NS,'highlight')].forEach(h=>h.parentNode&&h.parentNode.removeChild(h));
+  ts[0].textContent=rot;ts[0].setAttribute('xml:space','preserve');
+  ts.slice(1).forEach(t=>{t.textContent=''});
+  const pai=sdt.parentNode;while(cont.firstChild)pai.insertBefore(cont.firstChild,sdt);pai.removeChild(sdt);
+  achados.push({rotulo:rot,alias:nome})});
+ return achados}
+/* Nome dado pelo escrit\u00f3rio ao campo, min\u00fasculo e sem acento, apontando para o cadastro */
+const LM_SDT_CAMPO={
+ 'nome':'cliente.nome','nome completo':'cliente.nome','nome do cliente':'cliente.nome','nome do outorgante':'cliente.nome',
+ 'nome do contratante':'cliente.nome','nome do declarante':'cliente.nome','nome do preponente':'cliente.nome','cliente':'cliente.nome',
+ 'cpf':'cliente.cpf','c.p.f.':'cliente.cpf','cpf do cliente':'cliente.cpf','cnpj':'cliente.cnpj',
+ 'rg':'cliente.rg','identidade':'cliente.rg','estado civil':'cliente.estado_civil','profissao':'cliente.profissao',
+ 'nacionalidade':'cliente.nacionalidade','endereco':'cliente.endereco_completo','endereco completo':'cliente.endereco_completo',
+ 'qualificacao':'cliente.qualificacao','data de nascimento':'cliente.nascimento',
+ 'rua':'cliente.logradouro','logradouro':'cliente.logradouro','numero':'cliente.numero','bairro':'cliente.bairro',
+ 'municipio':'cliente.cidade','cidade':'cliente.cidade','estado':'cliente.uf','uf':'cliente.uf','cep':'cliente.cep',
+ 'cidade/uf':'local','cidade / uf':'local','lugar':'local','local':'local','local e data':'local_data','data':'data',
+ 'numero do processo':'processo','processo':'processo','autos':'processo',
+ 'tipo da acao':'acao','acao':'acao','objeto':'objeto',
+ 'parte contraria':'parte_contraria','nome exequente':'cliente.nome','nome executado':'parte_contraria',
+ 'oab':'advogado.oab','numero da oab':'advogado.oab','advogado':'advogado.nome','nome do advogado':'advogado.nome',
+ 'comarca/tribunal':'juizo','juizo':'juizo','vara':'juizo',
+ 'nome do preposto':'preposto.nome','cpf do preposto':'preposto.cpf','data e hora da audiencia':'audiencia',
+ 'beneficio':'beneficio','numero do beneficio':'nb','nb':'nb','nit':'nit'};
+function lmSemAcento(x){return String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()}
+function lmSdtCampo(alias,tipo){const k=lmSemAcento(alias);
+ /* no substabelecimento, a qualifica\u00e7\u00e3o e o endere\u00e7o s\u00e3o do advogado que recebe os poderes */
+ if(/substab/.test(tipo||'')){const A={'nome':'advogado2.nome','cpf':'advogado2.cpf','oab':'advogado2.oab','rua':'advogado2.logradouro','logradouro':'advogado2.logradouro','numero':'advogado2.numero','bairro':'advogado2.bairro','municipio':'advogado2.cidade','cidade':'advogado2.cidade','estado':'advogado2.uf','uf':'advogado2.uf','cep':'advogado2.cep','endereco':'advogado2.endereco_completo'};if(A[k])return A[k]}
+ return LM_SDT_CAMPO[k]||''}
 const LM_MESES_RE='(?:janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)';
-function lmDxDetectar(pars){const M=[],add=(de,campo,uma)=>{de=String(de||'').trim();if(de.length<2||M.some(x=>x.de===de))return;M.push({de,campo,uma:!!uma})};const T=pars.join('\n');
+function lmDxDetectar(pars,achados,tipo){const M=[],add=(de,campo,uma)=>{de=String(de||'').trim();if(de.length<2||M.some(x=>x.de===de))return;M.push({de,campo,uma:!!uma})};const T=pars.join('\n');
+ /* Quando o modelo usa controle de conte\u00fado do Word, o pr\u00f3prio escrit\u00f3rio j\u00e1 nomeou
+    cada campo. Nesse caso n\u00e3o adivinhamos nada: usamos o nome que ele deu. */
+ if(achados&&achados.length){achados.forEach(a=>add(a.rotulo,lmSdtCampo(a.alias,tipo),false));
+  const dt1=T.match(new RegExp("[A-Z\u00c0-\u00da][\\w\u00c0-\u00fa' ]{2,40}(?:\\s*[\\/\\-]\\s*[A-Z]{2})?,\\s*\\d{1,2}\u00ba? de "+LM_MESES_RE+" de \\d{4}","i"));
+  if(dt1)add(dt1[0],'local_data');else{const d2=T.match(new RegExp("\\d{1,2}\u00ba? de "+LM_MESES_RE+" de \\d{4}","i"));if(d2)add(d2[0],'data')}
+  return M}
  let i=pars.findIndex(p=>/^\s*(OUTORGANTE|CONTRATANTE|DECLARANTE|MANDANTE)/i.test(p)&&p.length>40);if(i<0)i=pars.findIndex(p=>/\d{3}\.\d{3}\.\d{3}-\d{2}/.test(p));const q=i>=0?pars[i]:'';
  if(q){const m=q.match(/^\s*(?:OUTORGANTE|CONTRATANTE|DECLARANTE|MANDANTE)S?\s*[:\-–]?\s*([^,]{5,80}),/i)||q.match(/^\s*(?:Eu,\s*)?([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú' ]{5,80}),/);if(m)add(m[1],'cliente.nome');
   const nac=q.match(/\b(brasileir[oa]|portugu[eê]sa?|argentin[oa]|paraguai[oa]|uruguai[oa]|venezuelan[oa]|haitian[oa]|italian[oa]|alem[ãa]o?)\b/i);if(nac)add(nac[1],'cliente.nacionalidade',true);
@@ -726,6 +866,107 @@ async function lmDxGerar(m,d){const dx=lmDxDados(m);const {zip,dom}=await lmDxAb
  const pt=lmConcPares(d).concat(lmGenPares(d,'tudo')),pq=lmGenPares(d,'qual');
  ps.forEach((p,i)=>{lmDxConc(p,pt);if(temCliente[i])lmDxConc(p,pq)});
  zip.file('word/document.xml',new XMLSerializer().serializeToString(dom));return zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',compression:'DEFLATE'})}
+/* ============ Preencher e gerar pelo próprio modelo ============
+   O advogado clica no documento da Biblioteca, abre uma janela com exatamente
+   os campos que aquele modelo pede, preenche e gera. Não passa pelo
+   formulário de sete passos, que serve para montar documento do zero. */
+const LM_PP={mod:null,vals:{},campos:[]};
+function lmPPRotulo(de){const t=String(de||'');
+ /* «Nome» e «Nome 2» são o mesmo campo: o número é só a contagem de ocorrências */
+ if(t.charAt(0)==='«')return t.replace(/^«|»$/g,'').replace(/\s+\d+$/,'').trim();
+ return t.trim()}
+function lmPPRotuloVisivel(it){if(it.campo==='data')return 'Data do documento';
+ if(it.campo==='local_data')return 'Local e data';
+ return it.rotulo}
+function lmPPCampos(m){const dx=lmDxDados(m);const vis=[],ja={};
+ (dx.mapa||[]).forEach(s=>{if(!s.de)return;const rot=lmPPRotulo(s.de);const k=rot.toLowerCase();
+  if(ja[k]){ja[k].des.push(s.de);return}
+  const it={chave:k,rotulo:rot,campo:s.campo||'',des:[s.de]};ja[k]=it;vis.push(it)});
+ return vis}
+function lmPPTipo(it){const k=lmSemAcento(it.rotulo),c=it.campo||'';
+ if(/^cpf/.test(k)||c==='cliente.cpf')return 'cpf';
+ if(/^cnpj/.test(k)||c==='cliente.cnpj')return 'cnpj';
+ if(/^cep/.test(k)||c==='cliente.cep')return 'cep';
+ if(c==='cliente.estado_civil'||/estado civil/.test(k))return 'estadocivil';
+ if(c==='local_data'||c==='data'||/^data$/.test(k))return 'data';
+ if(/endereco|logradouro|descricao|objeto|poderes/.test(k))return 'longo';
+ return 'texto'}
+function lmPPValorPadrao(it){const e=LM.esc||{};const c=it.campo||'';
+ if(c==='local'||/^cidade\s*\/?\s*uf$|^lugar$|^local$/.test(lmSemAcento(it.rotulo)))return (e.cidade||'')+(e.cidade&&e.uf?'/'+e.uf:'');
+ if(c==='data')return lmDataExt(hoje());
+ if(c==='local_data')return ((e.cidade||'')+(e.cidade&&e.uf?'/'+e.uf:''))+', '+lmDataExt(hoje());
+ if(c==='cliente.nacionalidade')return 'brasileiro';
+ return ''}
+function lmAbrirPreenchimento(id){const m=LM.modelos.find(x=>x.id===id);
+ if(!m){toast('Modelo não encontrado.');return}
+ if(!lmEhDocx(m)){lmUsarModelo(id);return}
+ LM_PP.mod=m;LM_PP.campos=lmPPCampos(m);LM_PP.vals={};
+ LM_PP.campos.forEach(it=>{LM_PP.vals[it.chave]=lmPPValorPadrao(it)});
+ lmPPDesenhar()}
+function lmPPDesenhar(){const m=LM_PP.mod,C=LM_PP.campos;
+ const cli=(LM.clientes||[]).slice(0,60);
+ const corpo=C.map((it,i)=>{const t=lmPPTipo(it),v=esc(LM_PP.vals[it.chave]||'');
+  const com=it.des.length>1?` <small class="sub">(aparece ${it.des.length} vezes)</small>`:'';
+  it.rotulo=lmPPRotuloVisivel(it);
+  if(t==='estadocivil'){const atual=LM_PP.vals[it.chave]||'';
+   const lista=LM_ESTCIVIL.map(([k,n])=>n).concat(atual&&!LM_ESTCIVIL.some(([k,n])=>n===atual)?[atual]:[]);
+   return `<div class="f"><label>${esc(it.rotulo)}${com}</label><select onchange="lmPPSet('${it.chave}',this.value)"><option value="">Escolher</option>${lista.map(n=>`<option value="${esc(n)}" ${n===atual?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`}
+  if(t==='longo')return `<div class="f s2"><label>${esc(it.rotulo)}${com}</label><input id="lmpp_${i}" value="${v}" oninput="lmPPSet('${it.chave}',this.value)"></div>`;
+  if(t==='cep')return `<div class="f"><label>${esc(it.rotulo)}${com}</label><input id="lmpp_${i}" value="${v}" inputmode="numeric" placeholder="00000-000" oninput="lmPPSet('${it.chave}',this.value)"></div>`;
+  return `<div class="f"><label>${esc(it.rotulo)}${com}</label><input id="lmpp_${i}" value="${v}" oninput="lmPPSet('${it.chave}',this.value)"></div>`}).join('');
+ const sel=cli.length?`<div class="f" style="margin-bottom:12px"><label>Puxar os dados de um cliente já cadastrado</label><select onchange="lmPPCliente(this.value)"><option value="">Digitar na mão</option>${cli.map(c=>`<option value="${c.id}">${esc(c.nome)}${c.documento?' · '+esc(c.documento):''}</option>`).join('')}</select></div>`:'';
+ const h=`<h2 style="margin-top:0">${esc(m.nome)}</h2>
+ <p class="sub" style="margin-top:-6px">${LM_DOCS[m.tipo]||m.tipo} · ${m.area==='todas'?'serve para qualquer área':(LM_AREAS[m.area]||m.area)} · ${C.length===1?'1 campo':C.length+' campos'}</p>
+ ${sel}
+ <div class="fields">${corpo||'<p class="sub">Este modelo não tem campo nenhum para preencher. Pode gerar direto.</p>'}</div>
+ <div id="lmppAviso"></div>
+ <div class="acts" style="flex-wrap:wrap"><button class="btn3" onclick="lmPPFechar()">Fechar</button>
+  <button class="btn2" onclick="lmPPVer(this)">Conferir o texto</button>
+  <button class="btn2" onclick="lmPPGerar('imprimir',this)">Imprimir</button>
+  <button class="btn" onclick="lmPPGerar('word',this)">Baixar em Word</button></div>`;
+ lmPPFechar();LM_PP.el=openModalPP(h)}
+function openModalPP(h){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="mbox" style="max-width:860px">${h}</div>`;m.onclick=e=>{if(e.target===m)lmPPFechar()};document.body.appendChild(m);return m}
+function lmPPFechar(){if(LM_PP.el&&LM_PP.el.parentNode)LM_PP.el.parentNode.removeChild(LM_PP.el);LM_PP.el=null}
+function lmPPSet(k,v){LM_PP.vals[k]=v}
+function lmPPCliente(id){const c=(LM.clientes||[]).find(x=>x.id===id);if(!c)return;
+ const d=(c.dados&&c.dados.cliente)||{};const nome=c.nome||d.nome||'';
+ const de={'cliente.nome':nome,'cliente.cpf':lmFmtCPF(d.cpf),'cliente.cnpj':lmFmtCNPJ(d.cnpj),'cliente.rg':d.rg||'',
+  'cliente.nacionalidade':d.nacionalidade||'','cliente.estado_civil':lmEstCivil(d.estadoCivil,d.genero),'cliente.profissao':d.profissao||'',
+  'cliente.endereco_completo':lmEnd(d),'cliente.logradouro':d.logradouro||'','cliente.numero':d.numero||'','cliente.bairro':d.bairro||'',
+  'cliente.cidade':d.cidade||'','cliente.uf':d.uf||'','cliente.cep':d.cep||''};
+ LM_PP.campos.forEach(it=>{if(it.campo&&de[it.campo])LM_PP.vals[it.chave]=de[it.campo]});
+ lmPPDesenhar();toast('Dados de '+nome+' preenchidos. Confira antes de gerar.')}
+function lmPPSubs(){const dx=lmDxDados(LM_PP.mod),L=[];
+ LM_PP.campos.forEach((it,i)=>{const v=String(LM_PP.vals[it.chave]||'').trim();
+  it.des.forEach((de,j)=>{L.push({de,uma:false,tok:'\u0001'+i+'_'+j+'\u0002',valor:v||de,campo:it.campo||''})})});
+ return L.sort((a,b)=>b.de.length-a.de.length)}
+function lmPPFalta(){return LM_PP.campos.filter(it=>!String(LM_PP.vals[it.chave]||'').trim()).map(it=>it.rotulo)}
+function lmPPVer(b){const dx=lmDxDados(LM_PP.mod),subs=lmPPSubs();
+ const linhas=lmDxTrocaTxt(dx.pars||[],subs,s=>s.valor).filter(x=>x.trim());
+ const falta=lmPPFalta();
+ const box=$('#lmppAviso');if(box)box.innerHTML=`${falta.length?`<div class="notice" style="margin:12px 0"><b>Ainda em branco:</b> ${esc(falta.join(', '))}. Se gerar assim, o documento sai com o espaço reservado no lugar.</div>`:'<div class="notice ok" style="margin:12px 0">Todos os campos preenchidos.</div>'}<div class="papel" style="max-height:320px;overflow:auto">${linhas.map(l=>'<p>'+esc(l)+'</p>').join('')}</div>`}
+async function lmPPGerar(acao,b){const m=LM_PP.mod,t0=b.textContent;b.disabled=true;b.textContent='Gerando...';
+ try{const dx=lmDxDados(m);const {zip,dom}=await lmDxAbrir(lmDeB64(dx.b64));const subs=lmPPSubs();
+  const ps=[...dom.getElementsByTagNameNS(W_NS,'p')];
+  ps.forEach(p=>lmDxTrocarPar(p,subs.map(s=>({alvo:s.de,por:s.tok,ref:s}))));
+  ps.forEach(p=>lmDxTrocarPar(p,subs.map(s=>({alvo:s.tok,por:s.valor}))));
+  const quem=(LM_PP.campos.find(it=>it.campo==='cliente.nome')||{});
+  const nomeCli=String(LM_PP.vals[quem.chave]||'').trim()||'cliente';
+  if(acao==='word'){zip.file('word/document.xml',new XMLSerializer().serializeToString(dom));
+   const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',compression:'DEFLATE'});
+   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+   a.download=((LM_DOCS[m.tipo]||m.nome)+' - '+nomeCli+'.docx').replace(/[\\/:*?"<>|]+/g,' ');
+   document.body.appendChild(a);a.click();a.remove();toast('Documento gerado no modelo do escritório.')}
+  else{const linhas=lmDxPars(dom).filter((x,i,a)=>x.trim()||(i>0&&a[i-1].trim()));
+   lmPPImprimir((LM_DOCS[m.tipo]||m.nome)+' - '+nomeCli,linhas)}
+ }catch(e){toast(e.message||'Não foi possível gerar o documento.')}
+ finally{b.disabled=false;b.textContent=t0}}
+function lmPPImprimir(titulo,linhas){const w=window.open('','_blank');
+ if(!w){toast('O navegador bloqueou a janela de impressão. Libere a janela e tente de novo.');return}
+ w.document.write('<!doctype html><meta charset="utf-8"><title>'+esc(titulo)+'</title><style>@page{size:A4;margin:3cm 2cm 2cm 3cm}body{font:12pt/1.5 Georgia,serif;color:#000}p{margin:0 0 10pt;text-align:justify}p.t{text-align:center;font-weight:700;font-size:14pt;margin-bottom:18pt}</style>'
+  +linhas.map((l,i)=>'<p'+(i===0?' class="t"':'')+'>'+esc(l)+'</p>').join(''));
+ w.document.close();setTimeout(()=>{w.focus();w.print()},300)}
+
 async function lmDxBaixar(b){const d=LM.doc,t0=b.textContent;b.disabled=true;b.textContent='Gerando...';try{let n=0;for(const k of lmDocsSel(d)){const m=lmModeloDe(k,d);if(!lmEhDocx(m))continue;const blob=await lmDxGerar(m,d);const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(LM_DOCS[k]+' '+(lmTitular(d)||'cliente')+'.docx').replace(/[\\/:*?"<>|]+/g,' ');document.body.appendChild(a);a.click();a.remove();n++;await new Promise(r=>setTimeout(r,400))}
   await lmSalvarDoc('Gerado',true);toast(n+(n===1?' documento gerado':' documentos gerados')+' no modelo do escritório')}catch(e){toast(e.message||String(e))}finally{b.disabled=false;b.textContent=t0}}
 function lmDxFalta(){const dx=LM.mod.dx,T=(dx.pars||[]).join('\n'),tem=k=>dx.mapa.some(x=>x.campo===k&&x.de),A=[];
@@ -741,7 +982,7 @@ function lmDxEditor(){const dx=LM.mod.dx;const nomeC=k=>(LM_CAMPOS.find(c=>c[0]=
  return `<div class="notice" style="margin-top:14px"><b>Arquivo: ${esc(dx.arquivo||'modelo.docx')}.</b> A fonte, o cabeçalho, o rodapé, o timbre e a marca d'água deste arquivo são mantidos. O sistema troca só os trechos da lista abaixo pelos dados do cadastro.</div>
  ${falta.length?`<div class="notice" style="margin-top:10px"><b>Confira antes de salvar:</b><ul style="margin:6px 0 0 18px;padding:0">${falta.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></div>`:'<div class="notice ok" style="margin-top:10px">Os dados essenciais estão ligados ao cadastro.</div>'}
  <div class="lmrev"><div><b>Campos reconhecidos</b><p class="sub" style="margin:4px 0 10px">Confira cada linha. O trecho da esquerda é o texto que está hoje no seu modelo. Ele será trocado pelo campo da direita.</p>
- ${dx.mapa.map((s,i)=>`<div class="lmcard" style="margin-top:8px;padding:10px"><div class="fields" style="grid-template-columns:1.4fr 1fr"><div class="f"><label>Trecho do modelo</label><input value="${esc(s.de)}" data-rs="0" oninput="LM.mod.dx.mapa[${i}].de=this.value;lmModPreviewDeb()"></div><div class="f"><label>Campo</label><select onchange="LM.mod.dx.mapa[${i}].campo=this.value;lmModPreviewDeb()">${LM_CAMPOS.map(([k,n])=>`<option value="${k}" ${s.campo===k?'selected':''}>${n}</option>`).join('')}</select></div></div>
+ ${dx.mapa.map((s,i)=>`<div class="lmcard" style="margin-top:8px;padding:10px"><div class="fields" style="grid-template-columns:1.4fr 1fr"><div class="f"><label>Trecho do modelo</label><input value="${esc(s.de)}" data-rs="0" oninput="LM.mod.dx.mapa[${i}].de=this.value;lmModPreviewDeb()"></div><div class="f"><label>Campo</label><select onchange="LM.mod.dx.mapa[${i}].campo=this.value;lmModPreviewDeb()"><option value="" ${s.campo?'':'selected'}>Escolher o campo</option>${LM_CAMPOS.map(([k,n])=>`<option value="${k}" ${s.campo===k?'selected':''}>${n}</option>`).join('')}</select></div></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><label class="chk" style="font-size:12px"><input type="checkbox" ${s.uma?'checked':''} onchange="LM.mod.dx.mapa[${i}].uma=this.checked;lmModPreviewDeb()"> Trocar só a primeira vez que aparece</label><button class="btn3" style="color:var(--bad)" onclick="LM.mod.dx.mapa.splice(${i},1);render()">Remover</button></div></div>`).join('')||'<p class="sub">Nenhum campo reconhecido. Adicione manualmente.</p>'}
  <div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="lmDxAdd()">+ Adicionar campo</button><button class="btn3" onclick="LM.semDx=true;LM.mod.dx=null;toast('Envie o arquivo de novo para converter em texto editável.');render()">Prefiro converter em texto editável</button></div>
  <p class="sub">Para adicionar: selecione com o mouse um trecho no texto ao lado e clique em Adicionar campo. Cada trecho precisa estar dentro de um único parágrafo. Para usar os poderes escolhidos na tela, adicione o trecho dos poderes do seu modelo e escolha o campo Poderes selecionados.</p></div>
