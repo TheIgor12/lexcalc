@@ -1,4 +1,4 @@
 {
-  "versao": "1.3.0",
-  "novidades": "Liquidação de sentença no padrão do Manual de Cálculos da Justiça Federal: tabelas e juros por tipo de ação, taxa legal do artigo 406 do Código Civil, IPCA-15, regra da poupança e honorários pela Súmula 111 do STJ."
+  "versao": "1.4.0",
+  "novidades": "Gerador das parcelas do benefício por competência, com salário mínimo, reajuste anual, valor já recebido e gratificação natalina, mais o desconto do imposto de renda sobre atrasados e da contribuição previdenciária."
 }
