@@ -65,7 +65,8 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 @media (max-width:600px){.grid3,.kpis,.fields{grid-template-columns:1fr}.f.s2{grid-column:auto}.logo{font-size:22px}}
 .lmtabs,.lmareas{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0}.lmtabs button,.lmareas button{background:#0b1620;border:1px solid #4d4231;color:#e9d9bb;border-radius:9px;padding:9px 14px}.lmtabs button.on,.lmareas button.on{border-color:var(--gold);color:#201304;background:linear-gradient(#ffe19b,#c99745);font-weight:800}
 .lmsteps{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}.lmsteps button{background:none;border:1px solid #3d3423;color:var(--mut);border-radius:20px;padding:7px 12px;display:flex;gap:8px;align-items:center}.lmsteps button span{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#1d2a33;font-size:12px}.lmsteps button.on{border-color:var(--gold);color:var(--gold2)}.lmsteps button.on span{background:var(--gold);color:#201304}.lmsteps button.ok span{background:#2e6b3c;color:#fff}
-.lmgrid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}.lmprev{position:sticky;top:90px}.lmrev{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+.lmgrid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}.lmprev{position:sticky;top:90px}
+.selo{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:999px;border:1px solid #4d4231;background:#0b1620;color:var(--mut);font-size:12px;font-weight:700}.lmrev{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
 .papel{background:#fff;color:#1a1a1a;border-radius:6px;padding:28px 30px;font:14px/1.6 Georgia,"Times New Roman",serif;max-height:72vh;overflow:auto;box-shadow:0 6px 24px #0008}.papel h4{text-align:center;font-size:17px;margin:0 0 14px;letter-spacing:.5px}.papel p{margin:0 0 6px;text-align:justify}.papel mark{background:#ffe8a3;color:#5a3d00;border-radius:3px;padding:0 2px}
 .lmcard{border:1px solid #4d4231;border-radius:12px;padding:14px;margin-top:12px;background:#0b1620}.lmpod{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}.lmchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.lmchips button{background:#1d2a33;border:1px solid #6e6a5e;color:#ffe0a3;border-radius:14px;padding:5px 10px;font-size:12px}
 @media (max-width:900px){.lmgrid,.lmrev,.lmpod{grid-template-columns:1fr}.lmprev{position:static}}
@@ -77,7 +78,7 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 <script src="/cliques.js" data-modo="app" defer></script></head>
 <body>
 <div id="app"></div>
-<script src="mandato.js?v=4"></script>
+<script src="mandato.js?v=5"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const SB=supabase.createClient('https://blszdbjpxgtloblxlusr.supabase.co','sb_publishable_0Tns_mDN2N1iQmw_sEzFXw_SRMy1uXK');
