@@ -1,4 +1,4 @@
 {
-  "versao": "1.8.1",
-  "novidades": "Quem recebeu um código de convite agora cria o próprio acesso pela mesma tela de cadastro, usando o código no lugar do nome do escritório, e já entra na equipe do escritório que existe, sem criar um escritório repetido."
+  "versao": "1.8.2",
+  "novidades": "Os exemplos cinza dentro dos campos de cadastro deixaram de trazer nome de escritório real e passaram a descrever o que se espera em cada campo."
 }

@@ -87,7 +87,7 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 <script src="/cliques.js" data-modo="app" defer></script></head>
 <body>
 <div id="app"></div>
-<script src="mandato.js?v=12"></script>
+<script src="mandato.js?v=13"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const SB=supabase.createClient('https://blszdbjpxgtloblxlusr.supabase.co','sb_publishable_0Tns_mDN2N1iQmw_sEzFXw_SRMy1uXK');
@@ -212,7 +212,7 @@ const OPT_JUR=`<option value="auto">Juros legais (0,5% até 01/2003, 1% até 08/
 /* ============ Tela ============ */
 function topo(){const it=[['inicio','Início'],['meus','Meus cálculos'],['mandato','LexMandato'],['assinar','Assinatura'],['config','Configurações'],['ajuda','Ajuda']];
  return `<div class="top"><div class="logo" onclick="ir('inicio')"><img src="assets/icone.png" alt=""><span>Lex <b>Calc</b></span></div><div class="nav">${it.map(([k,t])=>`<button class="${U.view===k?'on':''}" onclick="ir('${k}')">${t}</button>`).join('')}</div><div class="usr"><button class="btn3 atu" id="btnAtu" title="Procurar atualização do sistema" onclick="procurarAtualizacao(this)">${ICO_ATU} Procurar atualização</button><span class="eml">${esc(U.user?U.user.email:'')}</span><button class="btn3" onclick="sair()">Sair</button></div></div>`}
-const VERSAO_LEX='1.8.1';
+const VERSAO_LEX='1.8.2';
 const ICO_ATU='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>';
 async function procurarAtualizacao(btn){if(btn)btn.classList.add('gira');
  try{const r=await fetch('versao.json?t='+Date.now(),{cache:'no-store'});const j=await r.json();const v=String(j.versao||'').replace(/^v/i,'');
@@ -644,8 +644,8 @@ function telaLogin(){const m=U.lmodo||'entrar';
  ${m==='codigo'?`<p class="sub" style="margin-bottom:12px">Enviamos um código para ${esc(U.lemail||'')}. Digite o código para continuar.</p><div class="f"><label>Código</label><input id="lCod" inputmode="numeric" autocomplete="one-time-code"></div>${U.lrec?`<div class="f"><label>Nova senha</label><input id="lSen" type="password" autocomplete="new-password"></div>`:''}<button class="btn" onclick="confirmar()">Confirmar</button>`
  :m==='criar'?`<p class="sub" style="margin-bottom:14px">${U.lconv?'Use o código que o escritório lhe entregou. Você entra na equipe do escritório que já existe, com acesso próprio, sem dividir senha com ninguém.':'Cada escritório tem o próprio acesso e a própria biblioteca de documentos. Nada do seu escritório aparece para outro escritório.'}</p>
  ${U.lconv?`<div class="f"><label>Código do convite</label><input id="lCod2" style="text-transform:uppercase" placeholder="A1B2C3D4" value="${esc(U.lcodigo||'')}" oninput="U.lcodigo=this.value"></div>`
- :`<div class="f"><label>Nome do escritório</label><input id="lEsc" autocomplete="organization" placeholder="Edinei Marcondes Advogados Associados" value="${esc(U.lesc||'')}" oninput="sugUsuario()"></div>`}
- <div class="f"><label>${U.lconv?'Seu usuário':'Usuário do escritório'}</label><div class="usrbox"><input id="lUsr" autocomplete="username" spellcheck="false" placeholder="edineimarcondes" value="${esc(U.lusr||'')}" oninput="U.lusr=this.value;this.dataset.tocado=1"><span>@${LEX_DOM}</span></div></div>
+ :`<div class="f"><label>Nome do escritório</label><input id="lEsc" autocomplete="organization" placeholder="Nome completo, como aparece nos documentos" value="${esc(U.lesc||'')}" oninput="sugUsuario()"></div>`}
+ <div class="f"><label>${U.lconv?'Seu usuário':'Usuário do escritório'}</label><div class="usrbox"><input id="lUsr" autocomplete="username" spellcheck="false" placeholder="nome do escritório, sem espaço" value="${esc(U.lusr||'')}" oninput="U.lusr=this.value;this.dataset.tocado=1"><span>@${LEX_DOM}</span></div></div>
  <div class="f"><label>Senha</label><input id="lSen" type="password" autocomplete="new-password"></div>
  <div class="f"><label>${U.lconv?'Seu e-mail de contato':'E-mail de contato do responsável'}</label><input id="lCont" type="email" autocomplete="email" placeholder="contato@seuescritorio.com.br" value="${esc(U.lcont||'')}" oninput="U.lcont=this.value"></div>
  <p class="dica" style="margin:-4px 0 10px">O usuário acima é o seu login dentro do Lex Calc. O e-mail de contato serve para falarmos com você e para recuperar o acesso.</p>

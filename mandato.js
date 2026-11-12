@@ -485,7 +485,7 @@ function cfgEquipe(){
  if(LM.semOrg||!LM.org)return `<div class="panel"><h2 style="margin-top:0">Escritório e equipe</h2>${mestreTopo}
   <p class="sub">Os modelos, os clientes e os documentos do LexMandato pertencem ao escritório, não ao login. Assim, quando outra pessoa do escritório criar o acesso dela, encontra a mesma biblioteca, sem ninguém dividir senha.</p>
   <div class="notice" style="margin:12px 0">Você ainda não está em nenhum escritório. Crie o seu ou use um código de convite.</div>
-  <div class="f" style="margin-bottom:10px"><label>Nome do escritório</label><input id="lmOrgNome" placeholder="Edinei Marcondes Advogados Associados"></div>
+  <div class="f" style="margin-bottom:10px"><label>Nome do escritório</label><input id="lmOrgNome" placeholder="Nome completo, como aparece nos documentos"></div>
   <div class="acts" style="justify-content:flex-start"><button class="btn" onclick="lmCriarEscritorio()">Criar escritório</button></div>
   ${entrar}</div>`;
 
@@ -527,7 +527,7 @@ function lmAdmin(){if(!LM.mestre)return `<div class="panel"><div class="notice b
  const T=LM.todosEsc||[];
  return `<div class="panel"><h2 style="margin-top:0">Administração BlackSolutions</h2>
  <p class="sub">Você está no login mestre. Daqui você cria o escritório do cliente, alimenta a biblioteca dele e entrega o código para ele criar o próprio acesso. Toda vez que você escolhe um escritório aqui, fica registrado, e o escritório enxerga esse registro nas Configurações dele.</p>
- <div class="f" style="margin:14px 0 10px"><label>Nome do escritório novo</label><input id="lmAdmNome" placeholder="Edinei Marcondes Advogados Associados"></div>
+ <div class="f" style="margin:14px 0 10px"><label>Nome do escritório novo</label><input id="lmAdmNome" placeholder="Nome completo, como aparece nos documentos"></div>
  <div class="acts" style="justify-content:flex-start"><button class="btn" onclick="lmMestreCriar()">Criar escritório</button></div></div>
  <div class="panel"><h2 style="margin-top:0">Escritórios ${T.length?'<span class="selo">'+T.length+'</span>':''}</h2>
  ${T.length?T.map(e=>`<div class="rec" style="align-items:flex-start;flex-wrap:wrap;gap:10px">
