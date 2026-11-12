@@ -1,6 +1,6 @@
 /* LexMandato by BlackSolutions: procurações, declarações e contratos com a identidade do escritório.
    Módulo do Lex Calc. Usa o login, a assinatura e o papel timbrado do Lex Calc. Dados salvos na nuvem (tabelas lm_*). */
-const LM={tab:'painel',esc:null,org:null,orgs:[],equipe:[],semOrg:false,convite:null,lote:null,mestre:false,todosEsc:[],acessos:[],painel:null,painelContas:null,clientes:[],docs:[],modelos:[],doc:null,passo:1,busca:'',filtro:'',carregado:false,erroTabela:false,mod:null};
+const LM={tab:'painel',esc:null,org:null,orgs:[],equipe:[],semOrg:false,convite:null,lote:null,mestre:false,todosEsc:[],acessos:[],painel:null,painelContas:null,conect:null,audit:null,auditEsc:null,auditDias:30,meuAudit:[],clientes:[],docs:[],modelos:[],doc:null,passo:1,busca:'',filtro:'',carregado:false,erroTabela:false,mod:null};
 
 /* ============ Listas ============ */
 const LM_AREAS={civel:'Cível',trabalhista:'Trabalhista',previdenciario:'Previdenciário'};
@@ -249,7 +249,8 @@ async function lmCarregarOrg(){LM.org=null;LM.orgs=[];LM.equipe=[];LM.acessos=[]
  LM.semOrg=!LM.org;
  if(LM.org){
   try{const q=await SB.from('lm_membros').select('user_id,email,papel,criado_em').eq('escritorio_id',LM.org.id).order('criado_em');LM.equipe=q.data||[]}catch(e){}
-  try{const a=await SB.from('lm_acessos_mestre').select('email,acao,quando').eq('escritorio_id',LM.org.id).order('quando',{ascending:false}).limit(12);LM.acessos=(a&&a.data)||[]}catch(e){}}}
+  try{const a=await SB.from('lm_acessos_mestre').select('email,acao,quando').eq('escritorio_id',LM.org.id).order('quando',{ascending:false}).limit(12);LM.acessos=(a&&a.data)||[]}catch(e){}
+  try{const g=await SB.from('lm_auditoria').select('email,acao,detalhe,quando').eq('escritorio_id',LM.org.id).order('quando',{ascending:false}).limit(30);LM.meuAudit=(g&&g.data)||[]}catch(e){LM.meuAudit=[]}}}
 function lmOrgFiltro(q){return LM.org?q.or('escritorio_id.eq.'+LM.org.id+',escritorio_id.is.null'):q}
 function lmAdministra(){return !!(LM.mestre||(LM.org&&(LM.org.papel==='dono'||LM.org.papel==='suporte')))}
 async function lmCarregar(forcar){if(LM.carregado&&!forcar)return;LM.erroTabela=false;
@@ -263,7 +264,7 @@ async function lmCarregar(forcar){if(LM.carregado&&!forcar)return;LM.erroTabela=
   LM.esc=Object.assign({},vazio,LM.org.dados||{});
   LM.esc.nome=(LM.org.dados&&LM.org.dados.nome)||LM.org.nome}
  else LM.esc=(e.data&&e.data.dados)||base;
- LM.clientes=c.data||[];LM.docs=dd.data||[];LM.modelos=m.data||[];LM.carregado=true}
+ LM.clientes=c.data||[];LM.docs=dd.data||[];LM.modelos=m.data||[];LM.carregado=true;lmPing('LexMandato')}
 async function lmSalvarEsc(){
  if(LM.org){const nome=(LM.esc.nome||'').trim()||LM.org.nome;
   const {error}=await SB.from('lm_escritorios').update({nome,dados:LM.esc,atualizado_em:new Date().toISOString()}).eq('id',LM.org.id);
@@ -281,17 +282,17 @@ async function lmCriarEscritorio(){const nome=($('#lmOrgNome')&&$('#lmOrgNome').
 async function lmGerarConvite(papel){if(!LM.org)return;
  const {data,error}=await SB.rpc('lm_novo_convite',{p_escritorio:LM.org.id,p_papel:papel||'equipe'});
  if(error){toast(lmErroSql(error));return}
- LM.convite={codigo:data,papel:papel||'equipe'};render()}
+ LM.convite={codigo:data,papel:papel||'equipe'};lmReg('convite gerado',LM_PAPEIS[papel||'equipe']||'');render()}
 async function lmUsarConvite(){const c=($('#lmConvCod')&&$('#lmConvCod').value||'').trim().toUpperCase();
  if(c.length<6){toast('Digite o código completo.');return}
  const {data,error}=await SB.rpc('lm_usar_convite',{p_codigo:c});
  if(error){toast(lmErroSql(error));return}
  try{localStorage.setItem('lm_org',data)}catch(e){}
- LM.carregado=false;await lmCarregar(true);render();toast('Você entrou no escritório.')}
+ LM.carregado=false;await lmCarregar(true);lmReg('entrou na equipe',LM.org?LM.org.nome:'');render();toast('Você entrou no escritório.')}
 async function lmRemoverMembro(uid,email){if(!confirm('Tirar o acesso de '+email+'? Os documentos e modelos continuam no escritório.'))return;
  const {error}=await SB.rpc('lm_remover_membro',{p_escritorio:LM.org.id,p_user:uid});
  if(error){toast(lmErroSql(error));return}
- LM.carregado=false;await lmCarregar(true);render();toast('Acesso removido.')}
+ lmReg('acesso removido',email);LM.carregado=false;await lmCarregar(true);render();toast('Acesso removido.')}
 async function lmSairOrg(){if(!LM.org)return;
  if(!confirm('Desvincular a sua conta do escrit\u00f3rio '+LM.org.nome+'?\n\nOs documentos, os clientes e os modelos continuam no escrit\u00f3rio. Voc\u00ea \u00e9 que deixa de enxerg\u00e1-los.'))return;
  const {error}=await SB.rpc('lm_sair_escritorio',{p_escritorio:LM.org.id});
@@ -300,7 +301,18 @@ async function lmSairOrg(){if(!LM.org)return;
  LM.carregado=false;LM.doc=null;LM.mod=null;LM.lote=null;await lmCarregar(true);render();
  toast('Sua conta foi desvinculada do escrit\u00f3rio.')}
 async function lmTrocarOrg(id){try{localStorage.setItem('lm_org',id)}catch(e){}
+ LM_PING_T=0;
  LM.carregado=false;LM.doc=null;LM.mod=null;await lmCarregar(true);render();toast('Agora você está no escritório '+(LM.org?LM.org.nome:''))}
+/* ---------- Presença e auditoria ----------
+   lmPing diz que a pessoa está com o sistema aberto e em qual tela.
+   lmReg registra o que ela fez. Os dois são silenciosos: se o banco ainda
+   não tem essa parte, o sistema segue funcionando sem reclamar. */
+let LM_PING_T=0;
+async function lmPing(tela){const agora=Date.now();
+ if(!U.user||agora-LM_PING_T<120000)return;LM_PING_T=agora;
+ try{await SB.rpc('lm_ping',{p_tela:String(tela||U.view||''),p_escritorio:LM.org?LM.org.id:null})}catch(e){}}
+async function lmReg(acao,detalhe){if(!U.user)return;
+ try{await SB.rpc('lm_registrar',{p_acao:String(acao||''),p_detalhe:String(detalhe||''),p_escritorio:LM.org?LM.org.id:null})}catch(e){}}
 function lmErroSql(e){const m=String(e.message||e||'');
  if(/relation|does not exist|schema cache|function/i.test(m))return 'A parte de escritório ainda não foi ativada no banco de dados.';
  return m.replace(/^.*?:\s*/,'')||'Não foi possível concluir.'}
@@ -506,6 +518,7 @@ function cfgEquipe(){
   <div class="acts" style="justify-content:flex-start;margin-top:10px"><button class="btn2" onclick="lmGerarConvite('equipe')">Gerar código para a equipe</button><button class="btn3" onclick="lmGerarConvite('dono')">Gerar código de responsável</button></div>
   ${LM.convite?`<div class="notice" style="margin:12px 0">Código gerado para <b>${LM_PAPEIS[LM.convite.papel]}</b>: <b style="font-size:20px;letter-spacing:3px">${esc(LM.convite.codigo)}</b><br><small>Copie agora. Ele continua válido por 30 dias e some desta tela quando você sair.</small></div>`:''}`:'';
 
+ const meuLog=(LM.meuAudit&&LM.meuAudit.length)?`<h3>O que aconteceu neste escritório</h3><p class="sub">Registro do que cada pessoa da equipe fez, e também das entradas do suporte da BlackSolutions. Os últimos ${LM.meuAudit.length} registros.</p>${LM.meuAudit.map(x=>`<div class="rec"><div><b>${esc(x.acao)}</b>${x.detalhe?'<br><small class="sub">'+esc(x.detalhe)+'</small>':''}</div><div style="text-align:right"><small class="sub">${esc(x.email||'')}<br>${lmQuando(x.quando)}</small></div></div>`).join('')}`:'';
  const log=(LM.acessos&&LM.acessos.length)?`<h3>Registro de acesso da BlackSolutions</h3><p class="sub">Toda vez que o suporte da BlackSolutions entra neste escritório, fica registrado aqui.</p>${LM.acessos.map(x=>`<div class="rec"><div><b>${esc(x.email||'')}</b><br><small>${esc(x.acao||'')} em ${br(String(x.quando||'').slice(0,10))}</small></div><div></div></div>`).join('')}`:'';
  return `<div class="panel"><h2 style="margin-top:0">Escritório e equipe</h2>${mestreTopo}
   <p>Escritório: <b>${esc(LM.org.nome)}</b><br><span class="sub">Seu papel: ${LM_PAPEIS[LM.org.papel]||LM.org.papel}</span></p>
@@ -514,8 +527,14 @@ function cfgEquipe(){
   ${conv}
   ${entrar}
   ${log}
+  ${meuLog}
   <div class="acts" style="justify-content:flex-start;margin-top:14px">${verAbaPerfis()?`<button class="btn" onclick="ir('perfis')">Equipe e perfis de acesso</button>`:''}${lmAbaPode('escritorio')?`<button class="btn2" onclick="ir('mandato');lmIr('escritorio')">Dados do escritório e advogados</button>`:''}<button class="btn2" onclick="ir('mandato');lmIr('modelos')">Biblioteca de documentos</button>${LM.equipe.some(m=>m.user_id===eu)?`<button class="btn3" style="color:var(--bad)" onclick="lmSairOrg()">Desvincular minha conta deste escritório</button>`:''}</div></div>`}
 async function cfgCarregarLM(){await lmCarregar(true);render()}
+/* Recarrega só o registro do escritório, para a tela de Configurações
+   mostrar o que acabou de acontecer sem recarregar a biblioteca inteira. */
+async function lmAtualizarLog(){if(!LM.org)return;
+ try{const g=await SB.from('lm_auditoria').select('email,acao,detalhe,quando').eq('escritorio_id',LM.org.id).order('quando',{ascending:false}).limit(30);
+  const novo=(g&&g.data)||[];if(novo.length!==(LM.meuAudit||[]).length){LM.meuAudit=novo;if(U.view==='config')render()}else LM.meuAudit=novo}catch(e){}}
 
 /* Envio do modelo direto pela tela de Configurações */
 function cfgModelosResumo(){if(!LM.carregado)return 'Depois de enviar, o documento abre no LexMandato com os campos já reconhecidos, para você conferir e salvar.';
@@ -564,6 +583,38 @@ function lmCardPainel(){const P=LM.painel;
  ${pedidos.length?`<div class="panel"><h2 style="margin-top:0">Pediram mais prazo <span class="selo">${pedidos.length}</span></h2><p class="sub">Pedidos que ainda n\u00e3o foram atendidos.</p>${pedidos.map(linha).join('')}</div>`:''}
  <div class="panel"><h2 style="margin-top:0">Quem se cadastrou ${L.length?'<span class="selo">'+L.length+'</span>':''}</h2>
   ${L.length?L.map(linha).join(''):'<p class="sub">Nenhum cadastro ainda.</p>'}</div>`}
+/* ---------- Controle geral: quem está conectado e o que aconteceu ---------- */
+async function lmControle(){LM.conect=null;LM.audit=null;
+ try{const a=await SB.rpc('bs_conectados');if(!a.error)LM.conect=a.data||[]}catch(e){}
+ try{const b=await SB.rpc('bs_auditoria',{p_escritorio:LM.auditEsc||null,p_dias:LM.auditDias||30,p_limite:300});if(!b.error)LM.audit=b.data||[]}catch(e){}
+ render()}
+function lmQuando(t){if(!t)return 'nunca';const d=new Date(t),ag=new Date();const min=Math.floor((ag-d)/60000);
+ if(min<1)return 'agora';if(min<60)return 'h\u00e1 '+min+' min';
+ const h=Math.floor(min/60);if(h<24)return 'h\u00e1 '+h+(h===1?' hora':' horas');
+ return d.toLocaleDateString('pt-BR')+' \u00e0s '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+function lmCardControle(){
+ if(LM.conect===null||LM.conect===undefined)return `<div class="panel"><h2 style="margin-top:0">Controle geral</h2>
+  <p class="sub">Quem est\u00e1 com o sistema aberto agora e o que cada pessoa fez em cada escrit\u00f3rio.</p>
+  <div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="lmControle()">Carregar o controle</button></div></div>`;
+ if(!LM.conect.length&&!(LM.audit||[]).length)return `<div class="panel"><h2 style="margin-top:0">Controle geral</h2><div class="notice bad">Esta parte ainda n\u00e3o foi ativada no banco de dados. Rode o arquivo lexmandato_auditoria.sql no Supabase.</div></div>`;
+ const C=LM.conect||[];const on=C.filter(x=>x.online);
+ const linhaC=x=>`<div class="rec"><div style="flex:1;min-width:220px"><b>${esc(x.email||'sem e-mail')}</b> ${x.online?'<span class="selo" style="color:var(--ok)">conectado</span>':''}
+   <br><small class="sub">${x.escritorio?esc(x.escritorio):'sem escrit\u00f3rio'}${x.tela?' \u00b7 em '+esc(x.tela):''}</small></div>
+  <div style="min-width:190px;text-align:right"><small class="sub">${x.online?'visto '+lmQuando(x.visto_em):'\u00faltima entrada '+lmQuando(x.ultimo_acesso)}<br>conta criada em ${br(String(x.criado_em||'').slice(0,10))}</small></div></div>`;
+ const A=LM.audit||[];
+ const linhaA=x=>`<div class="rec"><div style="flex:1;min-width:240px"><b>${esc(x.acao)}</b>${x.detalhe?'<br><small class="sub">'+esc(x.detalhe)+'</small>':''}</div>
+  <div style="min-width:220px;text-align:right"><small class="sub">${esc(x.email||'')}<br>${x.escritorio?esc(x.escritorio)+' \u00b7 ':''}${lmQuando(x.quando)}</small></div></div>`;
+ const escs=(LM.todosEsc||[]);
+ return `<div class="panel"><h2 style="margin-top:0">Quem est\u00e1 conectado <span class="selo">${on.length}</span></h2>
+  <p class="sub">Fica como conectado quem usou o sistema nos \u00faltimos cinco minutos. A lista completa mostra tamb\u00e9m quem entrou por \u00faltimo.</p>
+  ${C.length?C.slice(0,40).map(linhaC).join(''):'<p class="sub">Ningu\u00e9m ainda.</p>'}
+  <div class="acts" style="justify-content:flex-start;margin-top:10px"><button class="btn3" onclick="lmControle()">Atualizar</button></div></div>
+ <div class="panel"><h2 style="margin-top:0">O que aconteceu</h2>
+  <p class="sub">Entrada no sistema, documento gerado, modelo enviado, convite, troca de equipe e c\u00e1lculo salvo. O escrit\u00f3rio enxerga o pr\u00f3prio registro, inclusive quando o suporte da BlackSolutions entra, que \u00e9 o que a Lei Geral de Prote\u00e7\u00e3o de Dados exige.</p>
+  <div class="fields" style="grid-template-columns:1fr 1fr;margin:12px 0">
+   <div class="f"><label>Escrit\u00f3rio</label><select onchange="LM.auditEsc=this.value||null;lmControle()"><option value="">Todos</option>${escs.map(e=>`<option value="${e.id}" ${LM.auditEsc===e.id?'selected':''}>${esc(e.nome)}</option>`).join('')}</select></div>
+   <div class="f"><label>Per\u00edodo</label><select onchange="LM.auditDias=parseInt(this.value,10);lmControle()">${[['7','\u00faltimos 7 dias'],['30','\u00faltimos 30 dias'],['90','\u00faltimos 90 dias'],['365','\u00faltimo ano']].map(([v,t])=>`<option value="${v}" ${String(LM.auditDias||30)===v?'selected':''}>${t}</option>`).join('')}</select></div></div>
+  ${A.length?A.map(linhaA).join(''):'<p class="sub">Nada registrado neste per\u00edodo.</p>'}</div>`}
 function lmAdmin(){if(!LM.mestre)return `<div class="panel"><div class="notice bad">Esta tela é do login mestre.</div></div>`;
  const T=LM.todosEsc||[];
  return `<div class="panel"><h2 style="margin-top:0">Administração BlackSolutions</h2>
@@ -581,7 +632,8 @@ function lmAdmin(){if(!LM.mestre)return `<div class="panel"><div class="notice b
    <button class="btn3" onclick="lmMestreConvite('${e.id}','dono')">Gerar código de responsável</button>
    <button class="btn3" onclick="lmMestreRenomear('${e.id}')">Renomear</button></div>
  </div>`).join(''):'<p class="sub">Nenhum escritório cadastrado ainda.</p>'}</div>
- ${lmCardPainel()}`}
+ ${lmCardPainel()}
+ ${lmCardControle()}`}
 async function lmMestreCriar(){const nome=($('#lmAdmNome')&&$('#lmAdmNome').value||'').trim();
  if(!nome){toast('Escreva o nome do escritório.');return}
  const {data,error}=await SB.rpc('lm_mestre_criar',{p_nome:nome});
@@ -591,11 +643,12 @@ async function lmMestreCriar(){const nome=($('#lmAdmNome')&&$('#lmAdmNome').valu
  toast('Escritório criado. Você já está dentro dele, pronto para enviar os documentos.')}
 async function lmMestreAbrir(id){try{localStorage.setItem('lm_org',id)}catch(e){}
  try{await SB.rpc('lm_mestre_registrar',{p_escritorio:id,p_acao:'entrou'})}catch(e){}
+ try{await SB.rpc('lm_registrar',{p_acao:'suporte entrou no escritório',p_detalhe:'login mestre',p_escritorio:id})}catch(e){}
  LM.carregado=false;LM.doc=null;LM.mod=null;LM.lote=null;LM.conviteAdm=null;await lmCarregar(true);LM.tab='modelos';render();
  toast('Agora você está no escritório '+(LM.org?LM.org.nome:''))}
 async function lmMestreConvite(id,papel){const {data,error}=await SB.rpc('lm_mestre_convite',{p_escritorio:id,p_papel:papel||'dono'});
  if(error){toast(lmErroSql(error));return}
- LM.conviteAdm={id,codigo:data,papel:papel||'dono'};render()}
+ LM.conviteAdm={id,codigo:data,papel:papel||'dono'};lmReg('convite gerado',(LM_PAPEIS[papel||'dono']||'')+' pelo login mestre');render()}
 async function lmMestreRenomear(id){const e=(LM.todosEsc||[]).find(x=>x.id===id);const nome=prompt('Novo nome do escritório:',e?e.nome:'');
  if(nome===null)return;if(!nome.trim()){toast('Escreva o nome do escritório.');return}
  const {error}=await SB.rpc('lm_mestre_renomear',{p_escritorio:id,p_nome:nome.trim()});
@@ -726,6 +779,7 @@ async function lmLoteSalvar(b){const L=LM.lote.filter(x=>x.estado==='pronto'||x.
  b.disabled=false;b.textContent=t0;
  LM.lote=LM.lote.filter(x=>x.estado!=='salvo');if(!LM.lote.length)LM.lote=null;
  await lmCarregar(true);render();
+ lmReg('modelos enviados em lote',ok+' modelo(s)'+(DUP.length?' e '+DUP.length+' duplicado(s)':''));
  toast(falhou.length?ok+' salvos. Não deu certo em '+falhou.length+': '+falhou[0]:(ok===1?'1 modelo salvo':ok+' modelos salvos')+' na biblioteca do escritório.')}
 
 /* ---------- Modelos do escritório ---------- */
@@ -801,7 +855,7 @@ async function lmSalvarModelo(){const m=LM.mod;if(!m.nome.trim()){toast('Dê um 
  const r=await SB.from('lm_modelos').insert(row).select('*').single();if(r.error){toast('Não foi possível salvar: '+r.error.message);return}
  if(m.id)await SB.from('lm_modelos').update({ativo:false}).eq('id',m.id);
  if(LM.doc&&LM.doc.modelos)Object.keys(LM.doc.modelos).forEach(k=>{if(LM.doc.modelos[k]===m.id)LM.doc.modelos[k]=r.data.id});
- LM.mod=null;await lmCarregar(true);render();toast('Modelo salvo na versão '+row.versao+'. Os documentos já emitidos continuam com a versão anterior.')}
+ LM.mod=null;lmReg('modelo enviado',row.nome+' ('+(LM_DOCS[row.tipo]||row.tipo)+', versão '+row.versao+')');await lmCarregar(true);render();toast('Modelo salvo na versão '+row.versao+'. Os documentos já emitidos continuam com a versão anterior.')}
 
 /* ============ PDF com papel timbrado ============ */
 async function lmPDF(){const d=LM.doc;const L=await carregarPdfLib();const {PDFDocument,StandardFonts,rgb}=L;const pdf=await PDFDocument.create();
@@ -834,7 +888,7 @@ async function lmGerar(acao,b){const t0=b.textContent;b.disabled=true;b.textCont
   const nome=(lmDocsSel(d).length>1?'Documentos':LM_DOCS[lmDocsSel(d)[0]])+' '+(lmTitular(d)||'cliente')+'.pdf';
   if(acao==='baixar'){const a=document.createElement('a');a.href=url;a.download=nome.replace(/[\\/:*?"<>|]+/g,' ');document.body.appendChild(a);a.click();a.remove()}
   else{let f=document.getElementById('frLm');if(f)f.remove();f=document.createElement('iframe');f.id='frLm';f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';f.src=url;f.onload=()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){window.open(url,'_blank')}};document.body.appendChild(f)}
-  setTimeout(()=>URL.revokeObjectURL(url),120000);await lmSalvarDoc('Gerado',true);toast('Documento gerado e salvo na nuvem')}catch(e){toast(e.message||String(e))}finally{b.disabled=false;b.textContent=t0}}
+  setTimeout(()=>URL.revokeObjectURL(url),120000);await lmSalvarDoc('Gerado',true);lmReg('documento gerado',lmDocsSel(LM.doc).map(k=>LM_DOCS[k]).join(', ')+' para '+lmTitular(LM.doc));toast('Documento gerado e salvo na nuvem')}catch(e){toast(e.message||String(e))}finally{b.disabled=false;b.textContent=t0}}
 function lmWord(){const d=LM.doc;const corpo=lmDocsSel(d).map(k=>lmTexto(k,d).split('\n').map(l=>{if(/^# /.test(l))return `<p align="center" style="text-align:center"><b>${esc(l.slice(2))}</b></p>`;if(!l.trim())return '<p>&nbsp;</p>';const h=esc(l).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');return /^_{6,}/.test(l)?`<p align="center" style="text-align:center">${h}</p>`:`<p style="text-align:justify">${h}</p>`}).join('')).join('<br clear="all" style="page-break-before:always">');
  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>body{font-family:"Times New Roman";font-size:12pt;line-height:1.5}p{margin:0 0 6pt}@page{margin:2.5cm 2cm 2cm 3cm}</style></head><body>${corpo}</body></html>`;
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+html],{type:'application/msword'}));a.download=((lmTitular(d)||'documento')+' LexMandato.doc').replace(/[\\/:*?"<>|]+/g,' ');document.body.appendChild(a);a.click();a.remove()}

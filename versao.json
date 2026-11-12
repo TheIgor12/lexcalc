@@ -1,4 +1,4 @@
 {
-  "versao": "1.10.4",
-  "novidades": "Ao enviar o papel timbrado, o sistema mede o próprio arquivo e já deixa certos os espaços de cabeçalho e de rodapé. Ninguém precisa adivinhar centímetro para o texto não encostar na marca nem na faixa do rodapé."
+  "versao": "1.11.0",
+  "novidades": "Administração geral da BlackSolutions no login mestre: quem está com o sistema aberto neste momento, em qual tela, e o registro do que foi feito em cada escritório, com data, hora e quem fez. Cada escritório também enxerga o próprio registro, inclusive as entradas do suporte, nas Configurações."
 }

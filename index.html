@@ -89,7 +89,7 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 <script src="/cliques.js" data-modo="app" defer></script></head>
 <body>
 <div id="app"></div>
-<script src="mandato.js?v=15"></script>
+<script src="mandato.js?v=16"></script>
 <script src="perfis.js?v=2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
@@ -215,7 +215,7 @@ const OPT_JUR=`<option value="auto">Juros legais (0,5% até 01/2003, 1% até 08/
 /* ============ Tela ============ */
 function topo(){const it=[['inicio','Início']];if(pode('calc_salvos'))it.push(['meus','Meus cálculos']);if(lmAlgumaAba())it.push(['mandato','LexMandato']);if(verAbaPerfis())it.push(['perfis','Equipe e perfis']);it.push(['assinar','Assinatura'],['config','Configurações'],['ajuda','Ajuda']);
  return `<div class="top"><div class="logo" onclick="ir('inicio')"><img src="assets/icone.png" alt=""><span>Lex <b>Calc</b></span></div><div class="nav">${it.map(([k,t])=>`<button class="${U.view===k?'on':''}" onclick="ir('${k}')">${t}</button>`).join('')}</div><div class="usr"><span class="ver" title="Versão do Lex Calc instalada neste navegador">v${VERSAO_LEX}</span><button class="btn3 atu" id="btnAtu" title="Procurar atualização do sistema" onclick="procurarAtualizacao(this)">${ICO_ATU} Procurar atualização</button><span class="eml">${esc(U.user?U.user.email:'')}</span><button class="btn3" onclick="sair()">Sair</button></div></div>`}
-const VERSAO_LEX='1.10.4';
+const VERSAO_LEX='1.11.0';
 const ICO_ATU='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>';
 async function procurarAtualizacao(btn){if(btn)btn.classList.add('gira');
  try{const r=await fetch('versao.json?t='+Date.now(),{cache:'no-store'});const j=await r.json();const v=String(j.versao||'').replace(/^v/i,'');
@@ -231,7 +231,7 @@ async function recarregarLimpo(){try{if(window.caches){const k=await caches.keys
  location.replace(location.pathname+'?v='+Date.now())}
 /* O perfil de acesso decide quais telas a pessoa abre */
 function telaPermitida(v){if(v==='meus')return pode('calc_salvos');if(v==='calc')return !U.calc||!U.calc.tipo||pode('calc_'+U.calc.tipo)||(U.calc.id&&pode('calc_salvos'));if(v==='mandato')return lmAlgumaAba();if(v==='perfis')return verAbaPerfis()||!LM.org;return true}
-function ir(v,extra){U.view=v;if(extra!==undefined)U.calc=extra;render();window.scrollTo(0,0)}
+function ir(v,extra){U.view=v;if(extra!==undefined)U.calc=extra;render();window.scrollTo(0,0);if(typeof lmPing==='function')lmPing(v)}
 function render(){try{render0()}catch(e){console.error(e);$('#app').innerHTML=`<div style="max-width:560px;margin:60px auto;padding:20px;color:#f3e6d2;font-family:system-ui"><h2>Algo deu errado ao abrir esta tela</h2><p>Recarregue a página. Se continuar, fale com o suporte pelo WhatsApp (47) 98843-2859.</p><button onclick="U.view='inicio';render()" style="padding:10px 16px">Voltar ao início</button></div>`}}
 function render0(){const a=$('#app');if(!U.user){a.innerHTML=telaLogin();return}
  if(!telaPermitida(U.view))U.view='inicio';let V={inicio:vInicio,meus:vMeus,ajuda:vAjuda,calc:vCalc,assinar:vAssinar,config:vConfig,mandato:vMandato,perfis:vPerfis}[U.view]||vInicio;if(!ASS.ok&&U.view!=='config')V=vAssinar;a.innerHTML=topo()+`<div class="bgleao"></div><div class="wrap">${U.view!=='assinar'&&ASS.ok?faixaAssinatura():''}${V()}</div>`;if(U.view==='calc')posCalc();if(U.view==='config')posConfig();if(U.view==='mandato')posMandato()}
@@ -584,7 +584,7 @@ function vConfig(){const p=pref();const u=U.user;
  <div class="panel"><h2 style="margin-top:0">Padrões de cálculo</h2><p class="sub">Já vêm preenchidos em todo cálculo novo. Você pode mudar em cada cálculo.</p><div class="f" style="margin:12px 0 10px"><label>Tabela ou índice padrão</label><select id="pInd">${OPT_IND}</select></div><div class="f" style="margin-bottom:10px"><label>Juros padrão</label><select id="pJur">${OPT_JUR}</select></div><div class="f"><label>Honorários de sucumbência padrão (%)</label><input id="pHon" value="${esc(String(p.honorarios||'0'))}"></div>
  <div class="acts"><button class="btn" onclick="salvarPref()">Salvar configurações</button></div></div>
  </div></div>`}
-function posConfig(){const p=pref();if($('#pInd'))$('#pInd').value=p.indice||'t_tjsc';if($('#pJur'))$('#pJur').value=p.juros||'auto';if(typeof lmCarregar==='function'&&!LM.carregado)lmCarregar().then(()=>{if(U.view==='config')render()}).catch(()=>{})}
+function posConfig(){const p=pref();if($('#pInd'))$('#pInd').value=p.indice||'t_tjsc';if($('#pJur'))$('#pJur').value=p.juros||'auto';if(typeof lmCarregar==='function'&&!LM.carregado)lmCarregar().then(()=>{if(U.view==='config')render()}).catch(()=>{});else if(typeof lmAtualizarLog==='function')lmAtualizarLog()}
 async function salvarPref(){const d={escritorio:$('#pEsc').value.trim(),advogado:$('#pAdv').value.trim(),oab:$('#pOab').value.trim(),contato:$('#pCon').value.trim(),indice:$('#pInd').value,juros:$('#pJur').value,honorarios:$('#pHon').value.trim()||'0'};const tb=timbreDe();const tbNovo=tb?Object.assign({},tb,$('#pTop')?{topo:$('#pTop').value.trim()||'4',rodape:$('#pRod').value.trim()||'3'}:{}):null;
  if(tb&&temOrg()){LM.esc=LM.esc||{};LM.esc.timbrado=tbNovo;await lmSalvarEsc()}
  else if(tbNovo)d.timbrado=tbNovo;
@@ -750,7 +750,7 @@ async function salvar(auto){if(!auto)lerForm();const c=U.calc;
  const temNum=!!c.processo;if(!temNum){if(auto)return false;if(c.id){toast('Informe o número do processo. Depois do primeiro cálculo ele é obrigatório.');$('#cProc').focus();return false}if(!c.sem_numero){toast('Informe o número do processo ou marque Distribuído sem número.');return false}}
  const row={tipo:c.tipo,processo:c.processo||null,autor:c.autor,reu:c.reu,sem_numero:!temNum,dados:c.dados,resultado:c.resultado,atualizado_em:new Date().toISOString()};
  const q=c.id?SB.from('lexcalc_calculos').update(row).eq('id',c.id).select().single():SB.from('lexcalc_calculos').insert(row).select().single();
- const {data,error}=await q;if(error){toast('Não foi possível salvar: '+error.message);return false}Object.assign(c,data);toast(auto?'Cálculo salvo automaticamente em Meus cálculos':'Cálculo salvo na nuvem');await carregar();if(!auto)render();return true}
+ const {data,error}=await q;if(error){toast('Não foi possível salvar: '+error.message);return false}Object.assign(c,data);if(typeof lmReg==='function'&&!auto)lmReg('cálculo salvo',(c.tipo||'')+(c.processo?' · processo '+c.processo:''));toast(auto?'Cálculo salvo automaticamente em Meus cálculos':'Cálculo salvo na nuvem');await carregar();if(!auto)render();return true}
 async function carregar(){let q=SB.from('lexcalc_calculos').select('id,tipo,processo,autor,reu,sem_numero,resultado,atualizado_em').order('atualizado_em',{ascending:false}).limit(60);
  const b=U.busca.trim();if(b){const P=b.replace(/[%,()*.:"'\\]/g,' ').split(/\s+/).filter(Boolean).slice(0,6);P.forEach(w=>{const d=w.replace(/\D/g,'');const ps=[`autor.ilike.*${w}*`,`reu.ilike.*${w}*`,`processo.ilike.*${w}*`];if(d.length>=4&&d!==w)ps.push(`processo.ilike.*${d}*`);q=q.or(ps.join(','))})}
  const {data,error}=await q;if(error){toast('Não foi possível carregar os cálculos: '+error.message);U.lista=[];return}U.lista=data||[]}
