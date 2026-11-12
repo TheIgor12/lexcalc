@@ -83,11 +83,13 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 .olhoW{position:relative;display:block;width:100%}.olhoW input{width:100%;padding-right:44px!important}.olhoB{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:inherit;opacity:.65;padding:6px;line-height:0}.olhoB:hover{opacity:1}
 .dtW{position:relative;display:flex;align-items:center;width:100%}.dtW .dtT{width:100%;padding-right:38px!important}.dtW input[type=date]{position:absolute;right:6px;bottom:0;width:28px;height:100%;opacity:0;pointer-events:none;border:0;padding:0}.dtW .dtB{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;padding:5px;line-height:0;cursor:pointer;color:inherit;opacity:.7}.dtW .dtB:hover{opacity:1}.dtErr{border-color:#dc2626!important;outline-color:#dc2626!important}
 .rsW{position:relative;display:flex;align-items:center;width:100%}.rsW>input{width:100%;padding-left:36px!important}.rsW .rsP{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:.92em;opacity:.7;pointer-events:none}
-.dtW .dtB{color:var(--gold2)}</style>
+.dtW .dtB{color:var(--gold2)}
+.soler label.btn,.soler label.btn2,.soler input[type=file],.soler .btn3[style*="var(--bad)"]{display:none!important}</style>
 <script src="/cliques.js" data-modo="app" defer></script></head>
 <body>
 <div id="app"></div>
 <script src="mandato.js?v=14"></script>
+<script src="perfis.js?v=2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const SB=supabase.createClient('https://blszdbjpxgtloblxlusr.supabase.co','sb_publishable_0Tns_mDN2N1iQmw_sEzFXw_SRMy1uXK');
@@ -210,9 +212,9 @@ const OPT_IND=`<optgroup label="Tabelas dos tribunais">${Object.entries(TAB).map
 const OPT_JUR=`<option value="auto">Juros legais (0,5% até 01/2003, 1% até 08/2024, depois taxa legal)</option><optgroup label="Manual de Cálculos da Justiça Federal">${Object.entries(JF).map(([k,x])=>`<option value="jf_${k}">Justiça Federal: ${esc(x.n)}</option>`).join('')}</optgroup><option value="livre">Taxa livre (você informa o percentual)</option><option value="1">1% ao mês (simples)</option><option value="1c">1% ao mês capitalizado (compostos)</option><option value="05">0,5% ao mês (simples)</option><option value="selic">Selic acumulada (regra da Receita Federal)</option><option value="selicc">Selic capitalizada (juros compostos)</option><option value="6a">6% ao ano (art. 1.062 do Código Civil de 1916)</option><option value="12a">12% ao ano (simples)</option><option value="legal">Taxa legal: Selic menos IPCA (Lei 14.905/2024)</option><option value="poup">Juros da poupança (Fazenda Pública, 07/2009 a 11/2021)</option><option value="nenhum">Sem juros</option>`;
 
 /* ============ Tela ============ */
-function topo(){const it=[['inicio','Início'],['meus','Meus cálculos'],['mandato','LexMandato'],['assinar','Assinatura'],['config','Configurações'],['ajuda','Ajuda']];
+function topo(){const it=[['inicio','Início']];if(pode('calc_salvos'))it.push(['meus','Meus cálculos']);if(lmAlgumaAba())it.push(['mandato','LexMandato']);if(verAbaPerfis())it.push(['perfis','Equipe e perfis']);it.push(['assinar','Assinatura'],['config','Configurações'],['ajuda','Ajuda']);
  return `<div class="top"><div class="logo" onclick="ir('inicio')"><img src="assets/icone.png" alt=""><span>Lex <b>Calc</b></span></div><div class="nav">${it.map(([k,t])=>`<button class="${U.view===k?'on':''}" onclick="ir('${k}')">${t}</button>`).join('')}</div><div class="usr"><button class="btn3 atu" id="btnAtu" title="Procurar atualização do sistema" onclick="procurarAtualizacao(this)">${ICO_ATU} Procurar atualização</button><span class="eml">${esc(U.user?U.user.email:'')}</span><button class="btn3" onclick="sair()">Sair</button></div></div>`}
-const VERSAO_LEX='1.9.0';
+const VERSAO_LEX='1.9.2';
 const ICO_ATU='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>';
 async function procurarAtualizacao(btn){if(btn)btn.classList.add('gira');
  try{const r=await fetch('versao.json?t='+Date.now(),{cache:'no-store'});const j=await r.json();const v=String(j.versao||'').replace(/^v/i,'');
@@ -226,10 +228,12 @@ async function procurarAtualizacao(btn){if(btn)btn.classList.add('gira');
 async function recarregarLimpo(){try{if(window.caches){const k=await caches.keys();await Promise.all(k.map(x=>caches.delete(x)))}}catch(e){}
  try{if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()))}}catch(e){}
  location.replace(location.pathname+'?v='+Date.now())}
+/* O perfil de acesso decide quais telas a pessoa abre */
+function telaPermitida(v){if(v==='meus')return pode('calc_salvos');if(v==='calc')return !U.calc||!U.calc.tipo||pode('calc_'+U.calc.tipo)||(U.calc.id&&pode('calc_salvos'));if(v==='mandato')return lmAlgumaAba();if(v==='perfis')return verAbaPerfis()||!LM.org;return true}
 function ir(v,extra){U.view=v;if(extra!==undefined)U.calc=extra;render();window.scrollTo(0,0)}
 function render(){try{render0()}catch(e){console.error(e);$('#app').innerHTML=`<div style="max-width:560px;margin:60px auto;padding:20px;color:#f3e6d2;font-family:system-ui"><h2>Algo deu errado ao abrir esta tela</h2><p>Recarregue a página. Se continuar, fale com o suporte pelo WhatsApp (47) 98843-2859.</p><button onclick="U.view='inicio';render()" style="padding:10px 16px">Voltar ao início</button></div>`}}
 function render0(){const a=$('#app');if(!U.user){a.innerHTML=telaLogin();return}
- let V={inicio:vInicio,meus:vMeus,ajuda:vAjuda,calc:vCalc,assinar:vAssinar,config:vConfig,mandato:vMandato}[U.view]||vInicio;if(!ASS.ok&&U.view!=='config')V=vAssinar;a.innerHTML=topo()+`<div class="bgleao"></div><div class="wrap">${U.view!=='assinar'&&ASS.ok?faixaAssinatura():''}${V()}</div>`;if(U.view==='calc')posCalc();if(U.view==='config')posConfig();if(U.view==='mandato')posMandato()}
+ if(!telaPermitida(U.view))U.view='inicio';let V={inicio:vInicio,meus:vMeus,ajuda:vAjuda,calc:vCalc,assinar:vAssinar,config:vConfig,mandato:vMandato,perfis:vPerfis}[U.view]||vInicio;if(!ASS.ok&&U.view!=='config')V=vAssinar;a.innerHTML=topo()+`<div class="bgleao"></div><div class="wrap">${U.view!=='assinar'&&ASS.ok?faixaAssinatura():''}${V()}</div>`;if(U.view==='calc')posCalc();if(U.view==='config')posConfig();if(U.view==='mandato')posMandato()}
 const ICO_LEX={balanca:'<svg viewBox="0 0 24 24"><path d="M12 3v18M7 21h10M12 6 4 8m8-2 8 2"/><path d="M4 8 1.5 14.5h5zM20 8l-2.5 6.5h5z"/><path d="M1.5 14.5a2.5 2.5 0 0 0 5 0M17.5 14.5a2.5 2.5 0 0 0 5 0"/></svg>',
  martelo:'<svg viewBox="0 0 24 24"><path d="m14.5 3.5 6 6M17.5 2.5l4 4M12 6l6 6M3 21l8.5-8.5M9 15l-6 6"/><path d="m11 8 5 5 2.5-2.5-5-5z"/></svg>',
  porcento:'<svg viewBox="0 0 24 24"><path d="M19 5 5 19"/><circle cx="7.5" cy="7.5" r="3"/><circle cx="16.5" cy="16.5" r="3"/></svg>',
@@ -237,11 +241,12 @@ const ICO_LEX={balanca:'<svg viewBox="0 0 24 24"><path d="M12 3v18M7 21h10M12 6 
  escudo:'<svg viewBox="0 0 24 24"><path d="M12 2.5 4 5.5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10v-6z"/><path d="m8.8 12 2.3 2.3 4.1-4.6"/></svg>',
  contrato:'<svg viewBox="0 0 24 24"><path d="M7 2.5h7l4.5 4.5v14a1.5 1.5 0 0 1-1.5 1.5H7a1.5 1.5 0 0 1-1.5-1.5v-17A1.5 1.5 0 0 1 7 2.5z"/><path d="M13.5 2.5V7H18M8.5 12h7M8.5 16h7"/></svg>'};
 function icoLex(k){return ICO_LEX[k]||''}
-function vInicio(){return `<h1>O que você deseja calcular?</h1><p class="sub">Selecione uma modalidade para começar.</p>
- <div class="grid3">${[['juridico','balanca','Cálculo jurídico','Atualização de valores, juros, multas e honorários.'],['liquidacao','martelo','Liquidação de sentença','Verbas da decisão, cumprimento de sentença e art. 523 do CPC.'],['tributario','porcento','Cálculo tributário','Débitos e restituições pela Selic e simulação de IBS e CBS.']].map(([k,s,t,d])=>`<div class="choice"><div class="sym">${icoLex(s)}</div><h2>${t}</h2><p>${d}</p><div class="cbt"><button class="btn" onclick="novo('${k}')">Iniciar cálculo ›</button></div></div>`).join('')}</div>
- <div class="panel" style="display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><h2 style="margin:0 0 4px">LexMandato</h2><p class="sub" style="margin:0">Procurações, declarações e contratos com o timbre do seu escritório, para cível, trabalhista e previdenciário.</p></div><button class="btn" onclick="ir('mandato')">Abrir o LexMandato ›</button></div>
- <div class="panel"><h2>Buscar cálculo salvo</h2><div style="display:flex;gap:10px;flex-wrap:wrap"><input id="qb" placeholder="Nome do autor, do réu ou número do processo" value="${esc(U.busca)}" style="flex:1;min-width:220px;background:#111e27;border:1px solid #6e6a5e;border-radius:7px;padding:11px;color:#fff" onkeydown="if(event.key==='Enter')buscar(this.value)"><button class="btn" onclick="buscar($('#qb').value)">Buscar</button></div></div>
- <div class="panel"><h2>Meus cálculos recentes</h2>${listaHTML(U.lista.slice(0,6))}</div>`}
+function vInicio(){const mods=[['juridico','balanca','Cálculo jurídico','Atualização de valores, juros, multas e honorários.'],['liquidacao','martelo','Liquidação de sentença','Verbas da decisão, cumprimento de sentença e art. 523 do CPC.'],['tributario','porcento','Cálculo tributário','Débitos e restituições pela Selic e simulação de IBS e CBS.']].filter(([k])=>pode('calc_'+k));const salvos=pode('calc_salvos');
+ return `${mods.length?`<h1>O que você deseja calcular?</h1><p class="sub">Selecione uma modalidade para começar.</p>`:`<h1>Bem-vindo ao Lex Calc</h1><p class="sub">${PERM.perfil?'Seu perfil é '+esc(PERM.perfil.nome)+'. ':''}Seu perfil não inclui os cálculos. As funções liberadas para você estão no menu acima.</p>`}
+ <div class="grid3">${mods.map(([k,s,t,d])=>`<div class="choice"><div class="sym">${icoLex(s)}</div><h2>${t}</h2><p>${d}</p><div class="cbt"><button class="btn" onclick="novo('${k}')">Iniciar cálculo ›</button></div></div>`).join('')}</div>
+ ${lmAlgumaAba()?`<div class="panel" style="display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><h2 style="margin:0 0 4px">LexMandato</h2><p class="sub" style="margin:0">Procurações, declarações e contratos com o timbre do seu escritório, para cível, trabalhista e previdenciário.</p></div><button class="btn" onclick="ir('mandato')">Abrir o LexMandato ›</button></div>`:''}
+ ${salvos?`<div class="panel"><h2>Buscar cálculo salvo</h2><div style="display:flex;gap:10px;flex-wrap:wrap"><input id="qb" placeholder="Nome do autor, do réu ou número do processo" value="${esc(U.busca)}" style="flex:1;min-width:220px;background:#111e27;border:1px solid #6e6a5e;border-radius:7px;padding:11px;color:#fff" onkeydown="if(event.key==='Enter')buscar(this.value)"><button class="btn" onclick="buscar($('#qb').value)">Buscar</button></div></div>
+ <div class="panel"><h2>Meus cálculos recentes</h2>${listaHTML(U.lista.slice(0,6))}</div>`:''}`}
 function listaHTML(L){if(!L.length)return `<p class="sub" style="text-align:center;padding:20px">Seus cálculos aparecerão aqui.</p>`;
  return L.map(c=>`<div class="rec"><div><b>${esc(c.autor)} × ${esc(c.reu)}</b>${c.sem_numero?'<span class="tag bad">Sem número do processo</span>':''}<br><small>${esc(c.processo||'Processo ainda sem número')} · ${({juridico:'Cálculo jurídico',liquidacao:'Liquidação de sentença',tributario:'Cálculo tributário'})[c.tipo]||c.tipo} · atualizado em ${new Date(c.atualizado_em).toLocaleDateString('pt-BR')}${c.resultado&&c.resultado.total!=null?' · '+R(c.resultado.total):''}</small></div><div style="display:flex;gap:8px"><button class="btn2" onclick="abrir('${c.id}')">Abrir e atualizar</button></div></div>`).join('')}
 function vMeus(){const q=U.busca;return `<h1>Meus cálculos</h1><p class="sub">Busque pelo nome do autor, do réu ou pelo número do processo.</p>
@@ -317,7 +322,7 @@ async function gerarComp(btn){const d=U.calc.dados;
 
 /* ============ Cálculo ============ */
 function vazio(tipo){const pf=pref();return {tipo,processo:'',autor:'',reu:'',sem_numero:false,dados:{dataCalculo:hoje(),indice:pf.indice||'t_tjsc',juros:pf.juros||'auto',modo:'individual',parc:{valor:'',qtd:'12',primeiro:'',dia:''},semDeflacao:false,jurosDesde:'',jurosAte:'',corrDe:'',corrAte:'',jurosModo:'mes',ipcaLei:false,multa:0,honorarios:pf.honorarios||0,art523:false,honBase:'cond',vcValor:'',vcData:'',sentData:'',comp:null,nMeses:'',desc:{ir:false,nm:'',dep:'0',pensao:'',jurosIR:false,prev:'',prevTeto:''},astr:{dia:'',ini:'',fim:'',teto:''},lanc:[{data:'',valor:'',desc:'',tipo:tipo==='liquidacao'?'mat':''}],trib:{modo:'debito',principal:'',venc:'',pag:hoje(),base:'',ano:'2026',cbs:'0,9',ibs:'0,1',is:'0'}},resultado:null}}
-function novo(tipo){U.calc=vazio(tipo);U.view='calc';render();window.scrollTo(0,0)}
+function novo(tipo){if(!pode('calc_'+tipo)){toast('Seu perfil não inclui este tipo de cálculo.');return}U.calc=vazio(tipo);U.view='calc';render();window.scrollTo(0,0)}
 function vCalc(){const c=U.calc,d=c.dados;const T={juridico:'Novo cálculo jurídico',liquidacao:'Liquidação de sentença',tributario:'Cálculo tributário'}[c.tipo];
  const tituloOk=c.id?(c.tipo==='juridico'?'Cálculo jurídico':T):T;
  return `<h1>${tituloOk}</h1>${c.id&&c.sem_numero?`<div class="notice bad"><b>Este processo ainda está sem número.</b> Para salvar esta atualização, informe o número do processo. Ele passou a ser obrigatório depois do primeiro cálculo.</div>`:''}
@@ -691,9 +696,9 @@ async function confirmar(){const token=$('#lCod').value.trim();const {error}=awa
 async function sair(){await SB.auth.signOut()}
 /* O Supabase trava se outra chamada a ele for feita dentro deste aviso: o trabalho roda logo depois, fora dele */
 SB.auth.onAuthStateChange((ev,sess)=>{const u=sess?sess.user:null;const mudou=(u&&u.id)!==(U.user&&U.user.id);U.user=u;if(!mudou&&ev!=='SIGNED_OUT')return;
- setTimeout(async()=>{try{if(u){await checarAssinatura();await carregar()}}catch(e){console.warn(e)}render()},0)});
+ setTimeout(async()=>{try{if(u){await checarAssinatura();await carregar();await carregarPermissoes()}}catch(e){console.warn(e)}render()},0)});
 $('#app').innerHTML='<p style="text-align:center;color:#c9b89b;padding:60px 20px;font-family:Georgia,serif;font-size:18px">Carregando o Lex Calc...</p>';
-(async()=>{let data={session:null};try{data=(await Promise.race([SB.auth.getSession(),new Promise((_,r)=>setTimeout(()=>r(new Error('tempo')),8000))])).data}catch(e){console.warn(e)}U.user=data.session?data.session.user:null;if(U.user){try{await checarAssinatura();await carregar()}catch(e){console.warn(e)}}render();if(U.user&&/[?&]pago=/.test(location.search))aguardarPagamento()})();
+(async()=>{let data={session:null};try{data=(await Promise.race([SB.auth.getSession(),new Promise((_,r)=>setTimeout(()=>r(new Error('tempo')),8000))])).data}catch(e){console.warn(e)}U.user=data.session?data.session.user:null;if(U.user){try{await checarAssinatura();await carregar();await carregarPermissoes()}catch(e){console.warn(e)}}render();if(U.user&&/[?&]pago=/.test(location.search))aguardarPagamento()})();
 
 /* Olhinho para mostrar ou esconder a senha */
 const OLHO='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',OLHO_X='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-2.4 3.4M6.6 6.6A17.5 17.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></svg>';
