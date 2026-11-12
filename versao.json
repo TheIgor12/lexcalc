@@ -1,4 +1,4 @@
 {
-  "versao": "1.9.2",
-  "novidades": "A aba Administração ganhou o painel de cadastros dos dois sistemas, com quantas pessoas entraram no BlackFlow e no Lex Calc, quem pediu mais dias de teste e o botão para conceder."
+  "versao": "1.9.3",
+  "novidades": "A versão do sistema passou a aparecer na barra superior, ao lado do botão de procurar atualização, e também nas Configurações, na caixa da conta."
 }
