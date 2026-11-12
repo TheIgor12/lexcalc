@@ -44,7 +44,9 @@ const PF={carregado:false,perfis:[],membros:[],edit:null,convite:null,erro:''};
 function pode(k){return !!(PERM.total||PERM.set.has(k))}
 function podeAlgum(L){return L.some(pode)}
 function podeAdministrar(){return !!(PERM.total||(typeof LM!=='undefined'&&LM.mestre))}
-function verAbaPerfis(){return !!(typeof LM!=='undefined'&&LM.org&&(podeAdministrar()||pode('perfis_admin')||pode('equipe_ver')||pode('equipe_convidar')))}
+/* A aba aparece para quem ainda não tem escritório (a tela explica como criar), para o login mestre
+   e para quem tem alguma permissão de equipe. Só some para a equipe sem essas permissões. */
+function verAbaPerfis(){if(typeof LM==='undefined'||!LM.org||LM.mestre)return true;return !!(podeAdministrar()||pode('perfis_admin')||pode('equipe_ver')||pode('equipe_convidar'))}
 
 async function permAtualizar(){
  if(typeof LM==='undefined'||!LM.org){PERM={total:true,set:new Set(PERM_TODAS),papel:null,perfil:null,semSql:false};return}
