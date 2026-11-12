@@ -1,4 +1,4 @@
 {
-  "versao": "1.8.2",
-  "novidades": "Os exemplos cinza dentro dos campos de cadastro deixaram de trazer nome de escritório real e passaram a descrever o que se espera em cada campo."
+  "versao": "1.9.0",
+  "novidades": "A aba Administração ganhou o painel de cadastros dos dois sistemas, com quantas pessoas entraram no BlackFlow e no Lex Calc, quem pediu mais dias de teste e o botão para conceder."
 }

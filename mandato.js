@@ -1,6 +1,6 @@
 /* LexMandato by BlackSolutions: procurações, declarações e contratos com a identidade do escritório.
    Módulo do Lex Calc. Usa o login, a assinatura e o papel timbrado do Lex Calc. Dados salvos na nuvem (tabelas lm_*). */
-const LM={tab:'painel',esc:null,org:null,orgs:[],equipe:[],semOrg:false,convite:null,lote:null,mestre:false,todosEsc:[],acessos:[],clientes:[],docs:[],modelos:[],doc:null,passo:1,busca:'',filtro:'',carregado:false,erroTabela:false,mod:null};
+const LM={tab:'painel',esc:null,org:null,orgs:[],equipe:[],semOrg:false,convite:null,lote:null,mestre:false,todosEsc:[],acessos:[],painel:null,painelContas:null,clientes:[],docs:[],modelos:[],doc:null,passo:1,busca:'',filtro:'',carregado:false,erroTabela:false,mod:null};
 
 /* ============ Listas ============ */
 const LM_AREAS={civel:'Cível',trabalhista:'Trabalhista',previdenciario:'Previdenciário'};
@@ -523,6 +523,40 @@ async function cfgModelo(inp,tipo){const f=inp.files&&inp.files[0];if(!f)return;
  LM.mod={tipo,area:'todas',nome:'',texto:''};render();
  await lmImportar(f)}
 /* ---------- Administração: só o login mestre ---------- */
+/* Painel de cadastros dos dois sistemas, só para o login mestre */
+async function lmPainelBS(){LM.painel=null;LM.painelContas=null;
+ try{const a=await SB.rpc('bs_painel');if(!a.error)LM.painel=a.data||[]}catch(e){}
+ try{const b=await SB.rpc('bs_painel_contas');if(!b.error)LM.painelContas=b.data||[]}catch(e){}
+ render()}
+async function lmConcederPrazo(id,nome){if(!confirm('Dar mais dias de teste para '+nome+'?'))return;
+ const {data,error}=await SB.rpc('bs_conceder_prazo',{p_clinica:id,p_dias:null});
+ if(error){toast(lmErroSql(error));return}
+ toast('Prazo estendido at\u00e9 '+br(String(data||'').slice(0,10)));await lmPainelBS()}
+function lmCardPainel(){const P=LM.painel;
+ if(P===null||P===undefined)return `<div class="panel"><h2 style="margin-top:0">Cadastros nos dois sistemas</h2>
+  <p class="sub">Quantas pessoas criaram conta no BlackFlow e no Lex Calc, com o prazo de teste de cada negócio.</p>
+  <div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="lmPainelBS()">Carregar o painel</button></div></div>`;
+ if(!P.length)return `<div class="panel"><h2 style="margin-top:0">Cadastros nos dois sistemas</h2><div class="notice bad">O painel ainda n\u00e3o foi ativado no banco de dados. Rode o arquivo bs_painel.sql no Supabase.</div></div>`;
+ const n=x=>Number(x||0);
+ const cx=r=>`<div class="rec" style="align-items:flex-start;flex-wrap:wrap;gap:10px">
+  <div style="flex:1;min-width:200px"><b>${esc(r.sistema)}</b><br><small class="sub">${n(r.contas)===1?'1 pessoa cadastrada':n(r.contas)+' pessoas cadastradas'} \u00b7 ${n(r.negocios)===1?'1 cadastro':n(r.negocios)+' cadastros'}</small></div>
+  <div style="min-width:260px;text-align:right"><small class="sub">hoje <b>${n(r.hoje)}</b> \u00b7 7 dias <b>${n(r.sete_dias)}</b> \u00b7 30 dias <b>${n(r.trinta_dias)}</b></small>
+  ${r.sistema==='BlackFlow'?`<br><small class="sub">em teste <b>${n(r.em_teste)}</b> \u00b7 pagando <b>${n(r.pagantes)}</b> \u00b7 vencidos <b>${n(r.vencidos)}</b></small>`:''}</div></div>`;
+ const L=LM.painelContas||[];
+ const pedidos=L.filter(x=>x.pedido_prazo);
+ const linha=r=>{const d=r.dias_restantes;
+  const st=r.sistema!=='BlackFlow'?'':(d===null||d===undefined?'':(d<0?'<span style="color:var(--bad)">vencido h\u00e1 '+(-d)+' dia'+(-d===1?'':'s')+'</span>':d+' dia'+(d===1?'':'s')+' restante'+(d===1?'':'s')));
+  return `<div class="rec" style="align-items:flex-start;flex-wrap:wrap;gap:10px">
+   <div style="flex:1;min-width:230px"><b>${esc(r.nome||'sem nome')}</b> <span class="selo">${esc(r.sistema)}</span>${r.pedido_prazo?' <span class="selo" style="color:var(--gold)">pediu mais prazo</span>':''}
+    <br><small class="sub">${esc(r.email||'sem e-mail')}${r.criado_em?' \u00b7 entrou em '+br(String(r.criado_em).slice(0,10)):''}</small></div>
+   <div style="min-width:180px;text-align:right"><small class="sub">${r.plano?esc(r.plano)+'<br>':''}${st}</small>
+   ${r.sistema==='BlackFlow'?`<br><button class="btn3" onclick="lmConcederPrazo('${r.id}','${esc(String(r.nome||'').replace(/'/g,''))}')">Dar mais dias</button>`:''}</div></div>`};
+ return `<div class="panel"><h2 style="margin-top:0">Cadastros nos dois sistemas</h2>
+  ${P.map(cx).join('')}
+  <div class="acts" style="justify-content:flex-start;margin-top:10px"><button class="btn3" onclick="lmPainelBS()">Atualizar</button></div></div>
+ ${pedidos.length?`<div class="panel"><h2 style="margin-top:0">Pediram mais prazo <span class="selo">${pedidos.length}</span></h2><p class="sub">Pedidos que ainda n\u00e3o foram atendidos.</p>${pedidos.map(linha).join('')}</div>`:''}
+ <div class="panel"><h2 style="margin-top:0">Quem se cadastrou ${L.length?'<span class="selo">'+L.length+'</span>':''}</h2>
+  ${L.length?L.map(linha).join(''):'<p class="sub">Nenhum cadastro ainda.</p>'}</div>`}
 function lmAdmin(){if(!LM.mestre)return `<div class="panel"><div class="notice bad">Esta tela é do login mestre.</div></div>`;
  const T=LM.todosEsc||[];
  return `<div class="panel"><h2 style="margin-top:0">Administração BlackSolutions</h2>
@@ -539,7 +573,8 @@ function lmAdmin(){if(!LM.mestre)return `<div class="panel"><div class="notice b
    <button class="btn2" onclick="lmMestreAbrir('${e.id}')">Alimentar este escritório</button>
    <button class="btn3" onclick="lmMestreConvite('${e.id}','dono')">Gerar código de responsável</button>
    <button class="btn3" onclick="lmMestreRenomear('${e.id}')">Renomear</button></div>
- </div>`).join(''):'<p class="sub">Nenhum escritório cadastrado ainda.</p>'}</div>`}
+ </div>`).join(''):'<p class="sub">Nenhum escritório cadastrado ainda.</p>'}</div>
+ ${lmCardPainel()}`}
 async function lmMestreCriar(){const nome=($('#lmAdmNome')&&$('#lmAdmNome').value||'').trim();
  if(!nome){toast('Escreva o nome do escritório.');return}
  const {data,error}=await SB.rpc('lm_mestre_criar',{p_nome:nome});
