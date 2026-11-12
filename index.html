@@ -215,7 +215,7 @@ const OPT_JUR=`<option value="auto">Juros legais (0,5% até 01/2003, 1% até 08/
 /* ============ Tela ============ */
 function topo(){const it=[['inicio','Início']];if(pode('calc_salvos'))it.push(['meus','Meus cálculos']);if(lmAlgumaAba())it.push(['mandato','LexMandato']);if(verAbaPerfis())it.push(['perfis','Equipe e perfis']);it.push(['assinar','Assinatura'],['config','Configurações'],['ajuda','Ajuda']);
  return `<div class="top"><div class="logo" onclick="ir('inicio')"><img src="assets/icone.png" alt=""><span>Lex <b>Calc</b></span></div><div class="nav">${it.map(([k,t])=>`<button class="${U.view===k?'on':''}" onclick="ir('${k}')">${t}</button>`).join('')}</div><div class="usr"><span class="ver" title="Versão do Lex Calc instalada neste navegador">v${VERSAO_LEX}</span><button class="btn3 atu" id="btnAtu" title="Procurar atualização do sistema" onclick="procurarAtualizacao(this)">${ICO_ATU} Procurar atualização</button><span class="eml">${esc(U.user?U.user.email:'')}</span><button class="btn3" onclick="sair()">Sair</button></div></div>`}
-const VERSAO_LEX='1.10.0';
+const VERSAO_LEX='1.10.1';
 const ICO_ATU='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>';
 async function procurarAtualizacao(btn){if(btn)btn.classList.add('gira');
  try{const r=await fetch('versao.json?t='+Date.now(),{cache:'no-store'});const j=await r.json();const v=String(j.versao||'').replace(/^v/i,'');
@@ -512,16 +512,42 @@ function pref(){return (U.user&&U.user.user_metadata&&U.user.user_metadata.lexca
    equipe. Fora de escritório, continuam valendo os dados pessoais da conta.
    As preferências de cálculo, como índice e juros, seguem pessoais. */
 function temOrg(){return !!(typeof LM!=='undefined'&&LM.org)}
+/* Sou gente da casa, não suporte entrando de fora. Só quem é da casa pode
+   aproveitar os próprios dados enquanto o escritório não preenche os dele.
+   O login mestre dentro do escritório de um cliente nunca empresta a própria
+   identidade, para não sair documento do cliente com o nome da BlackSolutions. */
+function souDaCasa(){return !!(temOrg()&&LM.org.papel!=='mestre')}
 function idEsc(){const p=pref();if(!temOrg())return p;
  const o=LM.org.dados||{};const a=(o.advogados&&o.advogados[0])||{};
- const oab=a.oab?('OAB '+String(a.oab).replace(/^OAB\s*/i,'')+(a.uf?'/'+a.uf:'')).replace(/^OAB\s*/,''):'';
+ const oab=a.oab?String(a.oab).replace(/^OAB\s*/i,'')+(a.uf?'/'+a.uf:''):'';
+ const casa=souDaCasa();
  return Object.assign({},p,{
-  escritorio:o.nome||LM.org.nome||p.escritorio||'',
-  advogado:a.nome||'',
-  oab:oab,
-  contato:o.contato||o.telefone||o.email||'',
-  timbrado:o.timbrado||null})}
+  escritorio:o.nome||LM.org.nome||(casa?p.escritorio:'')||'',
+  advogado:a.nome||(casa?p.advogado:'')||'',
+  oab:oab||(casa?p.oab:'')||'',
+  contato:o.contato||o.telefone||o.email||(casa?p.contato:'')||'',
+  timbrado:o.timbrado||(casa?p.timbrado:null)||null})}
 function timbreDe(){return (idEsc().timbrado)||null}
+/* Verdadeiro quando o timbre que está valendo ainda é o da conta pessoal,
+   emprestado para o escritório que não enviou o dele. */
+function timbrePessoalEmprestado(){const o=temOrg()?(LM.org.dados||{}):null;
+ return !!(o&&!o.timbrado&&souDaCasa()&&pref().timbrado&&pref().timbrado.path)}
+/* Copia o papel timbrado da conta pessoal para o escritório, para valer
+   para a equipe inteira. */
+async function timbreParaOrg(b){if(!temOrg()){toast('Você não está em um escritório.');return}
+ const t=pref().timbrado;if(!t||!t.path){toast('Você não tem papel timbrado para passar adiante.');return}
+ const t0=b?b.textContent:'';if(b){b.disabled=true;b.textContent='Passando para o escritório...'}
+ try{
+  const {data,error}=await SB.storage.from('lexcalc').download(t.path);
+  if(error||!data)throw new Error('Não foi possível ler o arquivo atual.');
+  const ext=(t.path.split('.').pop()||'pdf');const destino='esc/'+LM.org.id+'/timbrado.'+ext;
+  const up=await SB.storage.from('lexcalc').upload(destino,data,{upsert:true,contentType:t.tipo||'application/pdf'});
+  if(up.error)throw new Error(up.error.message);
+  LM.esc=LM.esc||{};LM.esc.timbrado={path:destino,tipo:t.tipo,nome:t.nome,topo:t.topo||'4',rodape:t.rodape||'3'};
+  if(!(await lmSalvarEsc()))throw new Error('Arquivo copiado, mas não foi possível salvar no escritório.');
+  toast('Papel timbrado agora é do escritório. Vale para a equipe inteira.');render()}
+ catch(e){toast(/row-level|policy|permission|denied/i.test(String(e.message))?'O banco recusou a gravação. Rode o arquivo lexmandato_timbre.sql no Supabase.':(e.message||'Não foi possível passar o papel timbrado para o escritório.'))}
+ finally{if(b){b.disabled=false;b.textContent=t0}}}
 function cabRel(){const p=idEsc(),c=U.calc||{};const esc2=esc;return `<div class="soprint cab"><b>${esc2(p.escritorio||'Lex Calc')}</b>${p.advogado?`<br>${esc2(p.advogado)}${p.oab?' · OAB '+esc2(p.oab):''}`:''}${p.contato?`<br>${esc2(p.contato)}`:''}<br><br>Processo: ${esc2(c.processo||'sem número')}<br>Autor: ${esc2(c.autor||'')} · Réu: ${esc2(c.reu||'')}</div>`}
 function assRel(){const p=pref();return p.advogado?`<div class="soprint" style="margin-top:40px;text-align:center">______________________________<br>${esc(p.advogado)}${p.oab?'<br>OAB '+esc(p.oab):''}</div>`:''}
 function stAss(){if(ASS.pagoAte&&ASS.pagoAte>=hoje())return `<span class="tag">Ativa</span> Liberada até ${br(ASS.pagoAte)}.`;if(ASS.dias>0)return `<span class="tag">Teste grátis</span> ${ASS.dias===1?'Falta 1 dia':'Faltam '+ASS.dias+' dias'}.`;return `<span class="tag bad">Vencida</span> Assine ou use um voucher para continuar calculando.`}
@@ -538,6 +564,7 @@ function vConfig(){const p=pref();const u=U.user;
  <h3>Papel timbrado do escritório</h3><p class="sub">Quer que a planilha de cálculo saia com a identidade do seu escritório? Envie aqui o modelo de apresentação das suas petições, em PDF ou imagem, com a logomarca, a marca d'água e os dados do escritório. Ele vira o fundo de todas as páginas da planilha impressa e do PDF baixado. Se o modelo tiver duas páginas, a segunda é usada a partir da página 2 da planilha.</p>
  <div class="notice" style="margin:12px 0"><b>Antes de enviar, deixe o corpo da folha em branco.</b> Mantenha só a logomarca, o cabeçalho, o rodapé e a marca d'água, que deve ser bem clara. Apague todo o texto do meio da página, como endereçamento ao juiz, nome do cliente, número do processo e assinatura: tudo o que estiver no arquivo aparece por baixo da planilha. Use o tamanho A4. No Word, apague o texto do corpo e salve como PDF.</div>
  ${temOrg()?`<div class="notice" style="margin:12px 0">O papel timbrado pertence ao escritório <b>${esc(LM.org.nome)}</b>. Vale para os cálculos e os documentos de todo mundo da equipe.</div>`:''}
+ ${timbrePessoalEmprestado()?`<div class="notice" style="margin:12px 0;border-color:var(--gold)">O escritório ainda não tem papel timbrado próprio, então os seus cálculos estão usando o que está na sua conta pessoal. Quem entrar com outro acesso da equipe gera planilha sem timbre. Passe o arquivo para o escritório e isso se resolve para todo mundo.<div class="acts" style="justify-content:flex-start;margin-top:10px"><button class="btn2" onclick="timbreParaOrg(this)">Usar este papel timbrado no escritório inteiro</button></div></div>`:''}
  ${timbreDe()?`<div class="notice" style="margin:12px 0">Em uso: <b>${esc(timbreDe().nome||'papel timbrado')}</b></div>`:''}
  <div class="acts" style="justify-content:flex-start;margin:12px 0 10px"><label class="btn" style="cursor:pointer">${timbreDe()?'Trocar o papel timbrado':'Enviar o papel timbrado'} (PDF, PNG ou JPG, até 8 MB)<input type="file" accept="application/pdf,image/png,image/jpeg" style="display:none" onchange="enviarTimbrado(this)"></label></div>
  ${timbreDe()?`<div class="fields" style="grid-template-columns:1fr 1fr"><div class="f"><label>Espaço do cabeçalho (cm)</label><input id="pTop" value="${esc(String(timbreDe().topo||'4'))}"></div><div class="f"><label>Espaço do rodapé (cm)</label><input id="pRod" value="${esc(String(timbreDe().rodape||'3'))}"></div></div><p class="dica">Ajuste os espaços para o texto da planilha não ficar em cima da logomarca nem do rodapé do seu modelo. Depois clique em Salvar configurações.</p><div class="acts" style="justify-content:flex-start"><button class="btn2" onclick="testarTimbrado(this)">Ver planilha de exemplo</button><button class="btn3" onclick="tirarTimbrado()">Remover papel timbrado</button></div>`:''}</div>
@@ -630,7 +657,7 @@ async function gerarPlanilha(){const r=U.calc&&U.calc.resultado;if(!r)throw new 
  const bloco=(tit,linhas,z)=>{if(!linhas.length)return;precisa(30);txt(tit,ML,y,FB,9.5);y-=13;linhas.forEach(t=>quebra(t,tw,F,z).forEach(l=>{precisa(11);txt(l,ML,y,F,z,cinza);y-=11}));y-=8};
  bloco('Memória de cálculo',D.memo,7.5);if(D.crit)bloco('Critérios',[D.crit],7.5);
  if(pf.advogado){precisa(60);y-=30;const ln='______________________________';const cx=W/2;txt(ln,cx-larg(ln,F,10)/2,y,F,10);y-=13;txt(pf.advogado,cx-larg(pf.advogado,F,10)/2,y,F,10);if(pf.oab){y-=12;const o='OAB '+pf.oab;txt(o,cx-larg(o,F,9)/2,y,F,9)}}
- const ps=pdf.getPages(),gerado='Planilha gerada pelo Lex Calc em '+new Date().toLocaleDateString('pt-BR');ps.forEach((p,i)=>{const t=gerado+'   ·   Página '+(i+1)+' de '+ps.length;p.drawText(limpa(t),{x:W-MR-F.widthOfTextAtSize(limpa(t),7),y:Math.max(14,rod-16),size:7,font:F,color:cinza})});
+ const ps=pdf.getPages(),gerado='Planilha gerada pelo Lex Calc em '+new Date().toLocaleDateString('pt-BR');ps.forEach((p,i)=>{const t=gerado+'   ·   Página '+(i+1)+' de '+ps.length;p.drawText(limpa(t),{x:W-MR-F.widthOfTextAtSize(limpa(t),7),y:tb.path?rod+6:Math.max(14,rod-16),size:7,font:F,color:cinza})});
  pdf.setTitle(D.titulo);pdf.setCreator('Lex Calc');return await pdf.save()}
 function nomeArq(){const c=U.calc||{};return ('Planilha '+(c.autor||'calculo')+' x '+(c.reu||'')+' '+((c.resultado&&c.resultado.ate)||hoje())).replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim()+'.pdf'}
 async function planilha(acao,b){const t0=b?b.textContent:'';if(b){b.disabled=true;b.textContent='Gerando...'}

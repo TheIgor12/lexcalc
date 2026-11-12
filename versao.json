@@ -1,4 +1,4 @@
 {
-  "versao": "1.10.0",
-  "novidades": "A identidade do escritório passou a valer para tudo: nome, advogado, OAB, contato e papel timbrado saem iguais nas planilhas de cálculo e em todos os documentos do LexMandato, para toda a equipe, em vez de ficarem presos à conta de quem enviou."
+  "versao": "1.10.1",
+  "novidades": "A planilha de cálculo volta a sair com o papel timbrado quando o escritório ainda não enviou o dele, usando o da sua conta, e passou a oferecer a passagem desse arquivo para o escritório inteiro. A linha de rodapé deixou de encostar na faixa do timbre."
 }
