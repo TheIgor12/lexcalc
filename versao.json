@@ -1,4 +1,4 @@
 {
-  "versao": "1.8.2",
-  "novidades": "Os exemplos cinza dentro dos campos de cadastro deixaram de trazer nome de escritório real e passaram a descrever o que se espera em cada campo."
+  "versao": "1.9.0",
+  "novidades": "Nova aba Equipe e perfis: o escritório cria perfis de acesso, como Recepcionista, Secretária, Setor Comercial, Assistente Jurídico, Advogados e Controladoria, marca as permissões de cada um e dá um perfil a cada pessoa da equipe."
 }
