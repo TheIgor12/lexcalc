@@ -1,4 +1,4 @@
 {
-  "versao": "1.8.0",
-  "novidades": "O cadastro passou a ser do escritório: nome do escritório, usuário próprio no domínio do Lex Calc, senha e e-mail de contato do responsável. O escritório já nasce criado, com biblioteca e clientes separados de qualquer conta pessoal, e cada pessoa pode desvincular a própria conta de um escritório."
+  "versao": "1.8.1",
+  "novidades": "Quem recebeu um código de convite agora cria o próprio acesso pela mesma tela de cadastro, usando o código no lugar do nome do escritório, e já entra na equipe do escritório que existe, sem criar um escritório repetido."
 }

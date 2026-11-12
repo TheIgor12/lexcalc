@@ -220,6 +220,18 @@ async function lmCarregarOrg(){LM.org=null;LM.orgs=[];LM.equipe=[];LM.acessos=[]
  }
  /* Conta nova de escritório: o escritório já nasce criado, com o nome que a
     pessoa escreveu no cadastro. Ninguém precisa criar nada depois. */
+ /* Quem se cadastrou com código de convite entra na equipe do escritório que
+    já existe, em vez de criar um escritório novo com o mesmo nome. */
+ if(!LM.org&&!LM.jaCriou){const md0=(U.user&&U.user.user_metadata)||{};let cod=(md0.convite||'').trim();
+  if(!cod){try{cod=(localStorage.getItem('lm_convite')||'').trim()}catch(e){}}
+  if(cod){LM.jaCriou=true;
+   try{const r=await SB.rpc('lm_usar_convite',{p_codigo:cod});
+    if(!r.error){try{localStorage.removeItem('lm_convite')}catch(e){}
+     try{await SB.auth.updateUser({data:{convite:''}})}catch(e){}
+     const q=await SB.from('lm_membros').select('escritorio_id,papel,lm_escritorios(id,nome,dados)').eq('user_id',U.user.id).eq('escritorio_id',r.data).maybeSingle();
+     if(q.data&&q.data.lm_escritorios){LM.org={id:q.data.escritorio_id,papel:q.data.papel,nome:q.data.lm_escritorios.nome,dados:q.data.lm_escritorios.dados||{}};LM.orgs=[{id:LM.org.id,papel:LM.org.papel,nome:LM.org.nome}]}}
+    else toast(lmErroSql(r.error))
+   }catch(e){}}}
  if(!LM.org&&!LM.jaCriou){const md=(U.user&&U.user.user_metadata)||{};let nome=(md.escritorio||'').trim();
   if(!nome){try{nome=(localStorage.getItem('lm_novo_esc')||'').trim()}catch(e){}}
   if(nome){LM.jaCriou=true;
