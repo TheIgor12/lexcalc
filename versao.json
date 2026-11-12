@@ -1,4 +1,4 @@
 {
-  "versao": "1.9.3",
-  "novidades": "A versão do sistema passou a aparecer na barra superior, ao lado do botão de procurar atualização, e também nas Configurações, na caixa da conta."
+  "versao": "1.10.0",
+  "novidades": "A identidade do escritório passou a valer para tudo: nome, advogado, OAB, contato e papel timbrado saem iguais nas planilhas de cálculo e em todos os documentos do LexMandato, para toda a equipe, em vez de ficarem presos à conta de quem enviou."
 }
