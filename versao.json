@@ -1,4 +1,4 @@
 {
-  "versao": "1.7.0",
-  "novidades": "A Biblioteca lê os modelos em Word .docx e .dotx pelos nomes dos próprios campos do escritório, separa os arquivos repetidos na área Duplicados repetidos e abre cada documento em uma janela de preenchimento, com os campos que aquele documento pede, conferência do texto, impressão e download em Word."
+  "versao": "1.8.0",
+  "novidades": "O cadastro passou a ser do escritório: nome do escritório, usuário próprio no domínio do Lex Calc, senha e e-mail de contato do responsável. O escritório já nasce criado, com biblioteca e clientes separados de qualquer conta pessoal, e cada pessoa pode desvincular a própria conta de um escritório."
 }

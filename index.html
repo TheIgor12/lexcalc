@@ -57,6 +57,11 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 .lbox{max-width:440px;width:100%;margin:0 auto;padding:20px}.lbox h1{font-size:62px;text-align:center;margin:0;background:linear-gradient(#ffe7b0,#c99745);-webkit-background-clip:text;background-clip:text;color:transparent}
 .lbox .sl{text-align:center;color:var(--mut);margin:0 0 22px;font-family:Georgia,serif;font-size:19px}.lcard{border:1px solid var(--gold);border-radius:16px;padding:24px;background:#08141ef0}.lcard h2{text-align:center}.lcard .f{margin-bottom:14px}
 .lcard .btn{width:100%;font-size:18px;height:50px}
+.usrbox{display:flex;align-items:stretch;border:1px solid #6e6a5e;border-radius:9px;background:#111e27;overflow:hidden}
+.usrbox input{flex:1;min-width:0;border:0;background:transparent;border-radius:0}
+.usrbox input:focus{outline:none;box-shadow:none}
+.usrbox span{display:flex;align-items:center;padding:0 12px;background:#0b1620;color:var(--mut);border-left:1px solid #6e6a5e;white-space:nowrap;font-size:14px}
+@media(max-width:480px){.usrbox span{font-size:12px;padding:0 8px}}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d2a33;border:1px solid var(--gold);color:var(--txt);padding:10px 18px;border-radius:10px;z-index:99}
 .modal{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}.mbox{background:#0b1721;border:1px solid var(--gold);border-radius:14px;padding:22px;max-width:620px;width:100%;max-height:90vh;overflow:auto}
 .memo{font-size:13px}.memo td{padding:5px 6px}
@@ -82,7 +87,7 @@ td input,td select{width:100%;background:#13222b;border:1px solid #586470;border
 <script src="/cliques.js" data-modo="app" defer></script></head>
 <body>
 <div id="app"></div>
-<script src="mandato.js?v=10"></script>
+<script src="mandato.js?v=11"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const SB=supabase.createClient('https://blszdbjpxgtloblxlusr.supabase.co','sb_publishable_0Tns_mDN2N1iQmw_sEzFXw_SRMy1uXK');
@@ -207,7 +212,7 @@ const OPT_JUR=`<option value="auto">Juros legais (0,5% até 01/2003, 1% até 08/
 /* ============ Tela ============ */
 function topo(){const it=[['inicio','Início'],['meus','Meus cálculos'],['mandato','LexMandato'],['assinar','Assinatura'],['config','Configurações'],['ajuda','Ajuda']];
  return `<div class="top"><div class="logo" onclick="ir('inicio')"><img src="assets/icone.png" alt=""><span>Lex <b>Calc</b></span></div><div class="nav">${it.map(([k,t])=>`<button class="${U.view===k?'on':''}" onclick="ir('${k}')">${t}</button>`).join('')}</div><div class="usr"><button class="btn3 atu" id="btnAtu" title="Procurar atualização do sistema" onclick="procurarAtualizacao(this)">${ICO_ATU} Procurar atualização</button><span class="eml">${esc(U.user?U.user.email:'')}</span><button class="btn3" onclick="sair()">Sair</button></div></div>`}
-const VERSAO_LEX='1.7.0';
+const VERSAO_LEX='1.8.0';
 const ICO_ATU='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>';
 async function procurarAtualizacao(btn){if(btn)btn.classList.add('gira');
  try{const r=await fetch('versao.json?t='+Date.now(),{cache:'no-store'});const j=await r.json();const v=String(j.versao||'').replace(/^v/i,'');
@@ -635,14 +640,46 @@ async function abrir(id){const {data,error}=await SB.from('lexcalc_calculos').se
 /* ============ Entrar ============ */
 function telaLogin(){const m=U.lmodo||'entrar';
  return `<div class="login"><div class="art"></div><div class="lbox"><h1 class="serif">Lex Calc</h1><p class="sl">Cálculos jurídicos e tributários</p><div class="lcard">
- <h2>${m==='entrar'?'Bem-vindo ao Lex Calc':m==='criar'?'Criar conta':m==='codigo'?'Confirme o seu e-mail':'Recuperar senha'}</h2>
+ <h2>${m==='entrar'?'Bem-vindo ao Lex Calc':m==='criar'?'Criar a conta do escritório':m==='codigo'?'Confirme o seu e-mail':'Recuperar senha'}</h2>
  ${m==='codigo'?`<p class="sub" style="margin-bottom:12px">Enviamos um código para ${esc(U.lemail||'')}. Digite o código para continuar.</p><div class="f"><label>Código</label><input id="lCod" inputmode="numeric" autocomplete="one-time-code"></div>${U.lrec?`<div class="f"><label>Nova senha</label><input id="lSen" type="password" autocomplete="new-password"></div>`:''}<button class="btn" onclick="confirmar()">Confirmar</button>`
- :`<div class="f"><label>E-mail</label><input id="lEm" type="email" autocomplete="email" value="${esc(U.lemail||'')}"></div>${m!=='recuperar'?`<div class="f"><label>Senha</label><input id="lSen" type="password" autocomplete="${m==='criar'?'new-password':'current-password'}" onkeydown="if(event.key==='Enter')entrar()"></div>`:''}
- <button class="btn" onclick="${m==='entrar'?'entrar()':m==='criar'?'criar()':'recuperar()'}">${m==='entrar'?'Entrar':m==='criar'?'Criar conta':'Enviar código'}</button>`}
- <p style="text-align:center;margin:16px 0 0">${m==='entrar'?`<button class="btn3" onclick="U.lmodo='recuperar';render()">Esqueci minha senha</button> · <button class="btn3" onclick="U.lmodo='criar';render()">Criar conta</button>`:`<button class="btn3" onclick="U.lmodo='entrar';U.lrec=0;render()">Voltar para entrar</button>`}</p>
+ :m==='criar'?`<p class="sub" style="margin-bottom:14px">Cada escritório tem o próprio acesso e a própria biblioteca de documentos. Nada do seu escritório aparece para outro escritório.</p>
+ <div class="f"><label>Nome do escritório</label><input id="lEsc" autocomplete="organization" placeholder="Edinei Marcondes Advogados Associados" value="${esc(U.lesc||'')}" oninput="sugUsuario()"></div>
+ <div class="f"><label>Usuário do escritório</label><div class="usrbox"><input id="lUsr" autocomplete="username" spellcheck="false" placeholder="edineimarcondes" value="${esc(U.lusr||'')}" oninput="U.lusr=this.value;this.dataset.tocado=1"><span>@${LEX_DOM}</span></div></div>
+ <div class="f"><label>Senha</label><input id="lSen" type="password" autocomplete="new-password"></div>
+ <div class="f"><label>E-mail de contato do responsável</label><input id="lCont" type="email" autocomplete="email" placeholder="contato@seuescritorio.com.br" value="${esc(U.lcont||'')}" oninput="U.lcont=this.value"></div>
+ <p class="dica" style="margin:-4px 0 14px">O usuário acima é o login do escritório dentro do Lex Calc. O e-mail de contato serve para falarmos com o responsável e para recuperar o acesso.</p>
+ <button class="btn" onclick="criar()">Criar conta do escritório</button>`
+ :`<div class="f"><label>E-mail ou usuário do escritório</label><input id="lEm" autocomplete="username" value="${esc(U.lemail||'')}"></div>${m!=='recuperar'?`<div class="f"><label>Senha</label><input id="lSen" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')entrar()"></div>`:''}
+ <button class="btn" onclick="${m==='entrar'?'entrar()':'recuperar()'}">${m==='entrar'?'Entrar':'Enviar código'}</button>`}
+ <p style="text-align:center;margin:16px 0 0">${m==='entrar'?`<button class="btn3" onclick="U.lmodo='recuperar';render()">Esqueci minha senha</button> · <button class="btn3" onclick="U.lmodo='criar';render()">Criar conta do escritório</button>`:`<button class="btn3" onclick="U.lmodo='entrar';U.lrec=0;render()">Voltar para entrar</button>`}</p>
  </div><p class="sub" style="text-align:center;margin-top:14px;font-size:12px">${m==='criar'?'Ao criar a conta, você aceita os ':''}<a href="https://blacksolutions.net.br/termos/" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="https://blacksolutions.net.br/privacidade/" target="_blank" rel="noopener">Política de Privacidade</a><br>Lex Calc · BlackSolutions</p></div></div>`}
-async function entrar(){const email=$('#lEm').value.trim(),password=$('#lSen').value;U.lemail=email;const {error}=await SB.auth.signInWithPassword({email,password});if(error){toast(/confirm/i.test(error.message)?'Confirme o e-mail antes de entrar.':'E-mail ou senha incorretos.');return}}
-async function criar(){const email=$('#lEm').value.trim(),password=$('#lSen').value;if(password.length<8){toast('A senha precisa ter pelo menos 8 caracteres.');return}U.lemail=email;const {data,error}=await SB.auth.signUp({email,password,options:{data:{app:'lexcalc'}}});if(error){toast(error.message);return}window.BSC&&BSC.evento('cadastro','lexcalc');if(data.session)return;U.lmodo='codigo';U.lrec=0;render()}
+/* Todo escritório entra com usuário próprio no domínio do Lex Calc, para os dados
+   de um escritório nunca ficarem pendurados na conta pessoal de ninguém. */
+const LEX_DOM='lexcalc.app.br';
+function lexUsuario(v){return String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9._-]/g,'').slice(0,40)}
+function sugUsuario(){const e=$('#lEsc'),u=$('#lUsr');if(!e||!u)return;U.lesc=e.value;
+ if(u.dataset.tocado)return;
+ const base=lexUsuario(e.value.replace(/\b(advogados?|associados?|advocacia|sociedade|escrit[o\u00f3]rio|e|de|da|do|dos|das)\b/gi,'').replace(/\s+/g,''));
+ u.value=base;U.lusr=base}
+function lexLogin(v){const t=String(v||'').trim();return t.indexOf('@')>0?t:(lexUsuario(t)+'@'+LEX_DOM)}
+async function entrar(){const email=lexLogin($('#lEm').value),password=$('#lSen').value;U.lemail=email;const {error}=await SB.auth.signInWithPassword({email,password});if(error){toast(/confirm/i.test(error.message)?'Confirme o e-mail antes de entrar.':'Usuário ou senha incorretos.');return}}
+async function criar(){
+ const nome=($('#lEsc')&&$('#lEsc').value||'').trim();
+ const usr=lexUsuario($('#lUsr')&&$('#lUsr').value);
+ const password=($('#lSen')&&$('#lSen').value)||'';
+ const contato=($('#lCont')&&$('#lCont').value||'').trim();
+ U.lesc=nome;U.lusr=usr;U.lcont=contato;
+ if(nome.length<3){toast('Escreva o nome do escritório.');return}
+ if(usr.length<3){toast('Escreva o usuário do escritório, com pelo menos três letras.');return}
+ if(password.length<8){toast('A senha precisa ter pelo menos 8 caracteres.');return}
+ if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contato)){toast('Escreva o e-mail de contato do responsável.');return}
+ const email=usr+'@'+LEX_DOM;U.lemail=email;
+ const {data,error}=await SB.auth.signUp({email,password,options:{data:{app:'lexcalc',escritorio:nome,contato}}});
+ if(error){toast(/already|registered|exists/i.test(error.message)?'Já existe um escritório com esse usuário. Escolha outro.':error.message);return}
+ window.BSC&&BSC.evento('cadastro','lexcalc');
+ try{localStorage.setItem('lm_novo_esc',nome)}catch(e){}
+ if(data.session){toast('Escritório '+nome+' criado.');return}
+ U.lmodo='codigo';U.lrec=0;render()}
 async function recuperar(){const email=$('#lEm').value.trim();U.lemail=email;const {error}=await SB.auth.resetPasswordForEmail(email);if(error){toast(error.message);return}U.lmodo='codigo';U.lrec=1;render()}
 async function confirmar(){const token=$('#lCod').value.trim();const {error}=await SB.auth.verifyOtp({email:U.lemail,token,type:U.lrec?'recovery':'signup'});if(error){toast('Código inválido ou vencido.');return}
  if(U.lrec){const {error:e2}=await SB.auth.updateUser({password:$('#lSen').value});if(e2){toast(e2.message);return}toast('Senha alterada')}U.lmodo='entrar';U.lrec=0}

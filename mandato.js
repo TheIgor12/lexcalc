@@ -218,6 +218,20 @@ async function lmCarregarOrg(){LM.org=null;LM.orgs=[];LM.equipe=[];LM.acessos=[]
    try{const d=await SB.from('lm_escritorios').select('id,nome,dados').eq('id',sel).maybeSingle();
     if(d.data)LM.org={id:d.data.id,papel:'mestre',nome:d.data.nome,dados:d.data.dados||{}}}catch(e){}}
  }
+ /* Conta nova de escritório: o escritório já nasce criado, com o nome que a
+    pessoa escreveu no cadastro. Ninguém precisa criar nada depois. */
+ if(!LM.org&&!LM.jaCriou){const md=(U.user&&U.user.user_metadata)||{};let nome=(md.escritorio||'').trim();
+  if(!nome){try{nome=(localStorage.getItem('lm_novo_esc')||'').trim()}catch(e){}}
+  if(nome){LM.jaCriou=true;
+   try{const r=await SB.rpc('lm_criar_escritorio',{p_nome:nome});
+    if(!r.error){
+     /* o escritório nasce uma vez só: apaga a marca para quem sair depois não
+        ser jogado de volta para dentro dele no acesso seguinte */
+     try{localStorage.removeItem('lm_novo_esc')}catch(e){}
+     try{await SB.auth.updateUser({data:{escritorio:''}})}catch(e){}
+     const d=await SB.from('lm_escritorios').select('id,nome,dados').eq('id',r.data).maybeSingle();
+     if(d.data){LM.org={id:d.data.id,papel:'dono',nome:d.data.nome,dados:d.data.dados||{}};LM.orgs=[{id:d.data.id,papel:'dono',nome:d.data.nome}]}}
+   }catch(e){}}}
  LM.semOrg=!LM.org;
  if(LM.org){
   try{const q=await SB.from('lm_membros').select('user_id,email,papel,criado_em').eq('escritorio_id',LM.org.id).order('criado_em');LM.equipe=q.data||[]}catch(e){}
@@ -229,7 +243,11 @@ async function lmCarregar(forcar){if(LM.carregado&&!forcar)return;LM.erroTabela=
  const [e,c,dd,m]=await Promise.all([SB.from('lm_escritorio').select('dados').maybeSingle(),lmOrgFiltro(SB.from('lm_clientes').select('*')).order('atualizado_em',{ascending:false}).limit(300),lmOrgFiltro(SB.from('lm_documentos').select('id,cliente_id,cliente_nome,area,titulo,status,atualizado_em,dados')).order('atualizado_em',{ascending:false}).limit(200),lmOrgFiltro(SB.from('lm_modelos').select('*').eq('ativo',true)).order('criado_em',{ascending:false})]);
  if(e.error&&/relation|does not exist|schema cache/i.test(e.error.message)){LM.erroTabela=true;LM.carregado=true;return}
  const p=pref();const base={nome:p.escritorio||'',cidade:'',uf:'SC',advogados:p.advogado?[{nome:p.advogado,oab:String(p.oab||'').replace(/\D/g,''),uf:'SC',nacionalidade:'brasileiro(a)'}]:[],sociedade:{}};
- if(LM.org){LM.esc=Object.assign({},base,LM.org.dados||{});LM.esc.nome=(LM.org.dados&&LM.org.dados.nome)||LM.org.nome}
+ /* O escritório tem cadastro próprio. Nada da conta pessoal de quem está logado
+    entra aqui, para os dados de um escritório não vazarem para outro. */
+ if(LM.org){const vazio={nome:'',cidade:'',uf:'SC',advogados:[],sociedade:{}};
+  LM.esc=Object.assign({},vazio,LM.org.dados||{});
+  LM.esc.nome=(LM.org.dados&&LM.org.dados.nome)||LM.org.nome}
  else LM.esc=(e.data&&e.data.dados)||base;
  LM.clientes=c.data||[];LM.docs=dd.data||[];LM.modelos=m.data||[];LM.carregado=true}
 async function lmSalvarEsc(){
@@ -260,6 +278,13 @@ async function lmRemoverMembro(uid,email){if(!confirm('Tirar o acesso de '+email
  const {error}=await SB.rpc('lm_remover_membro',{p_escritorio:LM.org.id,p_user:uid});
  if(error){toast(lmErroSql(error));return}
  LM.carregado=false;await lmCarregar(true);render();toast('Acesso removido.')}
+async function lmSairOrg(){if(!LM.org)return;
+ if(!confirm('Desvincular a sua conta do escrit\u00f3rio '+LM.org.nome+'?\n\nOs documentos, os clientes e os modelos continuam no escrit\u00f3rio. Voc\u00ea \u00e9 que deixa de enxerg\u00e1-los.'))return;
+ const {error}=await SB.rpc('lm_sair_escritorio',{p_escritorio:LM.org.id});
+ if(error){toast(lmErroSql(error));return}
+ try{localStorage.removeItem('lm_org')}catch(e){}
+ LM.carregado=false;LM.doc=null;LM.mod=null;LM.lote=null;await lmCarregar(true);render();
+ toast('Sua conta foi desvinculada do escrit\u00f3rio.')}
 async function lmTrocarOrg(id){try{localStorage.setItem('lm_org',id)}catch(e){}
  LM.carregado=false;LM.doc=null;LM.mod=null;await lmCarregar(true);render();toast('Agora você está no escritório '+(LM.org?LM.org.nome:''))}
 function lmErroSql(e){const m=String(e.message||e||'');
@@ -470,7 +495,7 @@ function cfgEquipe(){
   ${conv}
   ${entrar}
   ${log}
-  <div class="acts" style="justify-content:flex-start;margin-top:14px"><button class="btn2" onclick="ir('mandato');lmIr('escritorio')">Dados do escritório e advogados</button><button class="btn2" onclick="ir('mandato');lmIr('modelos')">Biblioteca de documentos</button></div></div>`}
+  <div class="acts" style="justify-content:flex-start;margin-top:14px"><button class="btn2" onclick="ir('mandato');lmIr('escritorio')">Dados do escritório e advogados</button><button class="btn2" onclick="ir('mandato');lmIr('modelos')">Biblioteca de documentos</button>${LM.equipe.some(m=>m.user_id===eu)?`<button class="btn3" style="color:var(--bad)" onclick="lmSairOrg()">Desvincular minha conta deste escritório</button>`:''}</div></div>`}
 async function cfgCarregarLM(){await lmCarregar(true);render()}
 
 /* Envio do modelo direto pela tela de Configurações */
