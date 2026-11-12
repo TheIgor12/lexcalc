@@ -311,8 +311,12 @@ let LM_PING_T=0;
 async function lmPing(tela){const agora=Date.now();
  if(!U.user||agora-LM_PING_T<120000)return;LM_PING_T=agora;
  try{await SB.rpc('lm_ping',{p_tela:String(tela||U.view||''),p_escritorio:LM.org?LM.org.id:null})}catch(e){}}
-async function lmReg(acao,detalhe){if(!U.user)return;
- try{await SB.rpc('lm_registrar',{p_acao:String(acao||''),p_detalhe:String(detalhe||''),p_escritorio:LM.org?LM.org.id:null})}catch(e){}}
+/* Registra o que foi feito. Dois textos de proposito:
+   detalhe  completo, com nome de cliente e numero de processo, para o escritorio
+   resumo   generico, para o login mestre, que nao precisa saber de quem e o caso.
+   Sem resumo informado, vale o detalhe, porque ali nao ha dado de ninguem. */
+async function lmReg(acao,detalhe,resumo){if(!U.user)return;
+ try{await SB.rpc('lm_registrar',{p_acao:String(acao||''),p_detalhe:String(detalhe||''),p_resumo:String(resumo===undefined?(detalhe||''):(resumo||'')),p_escritorio:LM.org?LM.org.id:null})}catch(e){}}
 function lmErroSql(e){const m=String(e.message||e||'');
  if(/relation|does not exist|schema cache|function/i.test(m))return 'A parte de escritório ainda não foi ativada no banco de dados.';
  return m.replace(/^.*?:\s*/,'')||'Não foi possível concluir.'}
@@ -610,7 +614,7 @@ function lmCardControle(){
   ${C.length?C.slice(0,40).map(linhaC).join(''):'<p class="sub">Ningu\u00e9m ainda.</p>'}
   <div class="acts" style="justify-content:flex-start;margin-top:10px"><button class="btn3" onclick="lmControle()">Atualizar</button></div></div>
  <div class="panel"><h2 style="margin-top:0">O que aconteceu</h2>
-  <p class="sub">Entrada no sistema, documento gerado, modelo enviado, convite, troca de equipe e c\u00e1lculo salvo. O escrit\u00f3rio enxerga o pr\u00f3prio registro, inclusive quando o suporte da BlackSolutions entra, que \u00e9 o que a Lei Geral de Prote\u00e7\u00e3o de Dados exige.</p>
+  <p class="sub">Entrada no sistema, documento gerado, modelo enviado, convite, troca de equipe e c\u00e1lculo salvo. O escrit\u00f3rio enxerga o pr\u00f3prio registro, inclusive quando o suporte da BlackSolutions entra, que \u00e9 o que a Lei Geral de Prote\u00e7\u00e3o de Dados exige.</p><p class="sub" style="margin-top:6px">Aqui o registro vem sem nome de cliente e sem número de processo. Esse detalhe fica com o escritório, que é o controlador dos dados dele. Para saber quem fez o quê e quando, que é a função desta tela, o resumo basta.</p>
   <div class="fields" style="grid-template-columns:1fr 1fr;margin:12px 0">
    <div class="f"><label>Escrit\u00f3rio</label><select onchange="LM.auditEsc=this.value||null;lmControle()"><option value="">Todos</option>${escs.map(e=>`<option value="${e.id}" ${LM.auditEsc===e.id?'selected':''}>${esc(e.nome)}</option>`).join('')}</select></div>
    <div class="f"><label>Per\u00edodo</label><select onchange="LM.auditDias=parseInt(this.value,10);lmControle()">${[['7','\u00faltimos 7 dias'],['30','\u00faltimos 30 dias'],['90','\u00faltimos 90 dias'],['365','\u00faltimo ano']].map(([v,t])=>`<option value="${v}" ${String(LM.auditDias||30)===v?'selected':''}>${t}</option>`).join('')}</select></div></div>
@@ -888,7 +892,7 @@ async function lmGerar(acao,b){const t0=b.textContent;b.disabled=true;b.textCont
   const nome=(lmDocsSel(d).length>1?'Documentos':LM_DOCS[lmDocsSel(d)[0]])+' '+(lmTitular(d)||'cliente')+'.pdf';
   if(acao==='baixar'){const a=document.createElement('a');a.href=url;a.download=nome.replace(/[\\/:*?"<>|]+/g,' ');document.body.appendChild(a);a.click();a.remove()}
   else{let f=document.getElementById('frLm');if(f)f.remove();f=document.createElement('iframe');f.id='frLm';f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';f.src=url;f.onload=()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){window.open(url,'_blank')}};document.body.appendChild(f)}
-  setTimeout(()=>URL.revokeObjectURL(url),120000);await lmSalvarDoc('Gerado',true);lmReg('documento gerado',lmDocsSel(LM.doc).map(k=>LM_DOCS[k]).join(', ')+' para '+lmTitular(LM.doc));toast('Documento gerado e salvo na nuvem')}catch(e){toast(e.message||String(e))}finally{b.disabled=false;b.textContent=t0}}
+  setTimeout(()=>URL.revokeObjectURL(url),120000);await lmSalvarDoc('Gerado',true);lmReg('documento gerado',lmDocsSel(LM.doc).map(k=>LM_DOCS[k]).join(', ')+' para '+lmTitular(LM.doc),lmDocsSel(LM.doc).length+' documento(s)');toast('Documento gerado e salvo na nuvem')}catch(e){toast(e.message||String(e))}finally{b.disabled=false;b.textContent=t0}}
 function lmWord(){const d=LM.doc;const corpo=lmDocsSel(d).map(k=>lmTexto(k,d).split('\n').map(l=>{if(/^# /.test(l))return `<p align="center" style="text-align:center"><b>${esc(l.slice(2))}</b></p>`;if(!l.trim())return '<p>&nbsp;</p>';const h=esc(l).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');return /^_{6,}/.test(l)?`<p align="center" style="text-align:center">${h}</p>`:`<p style="text-align:justify">${h}</p>`}).join('')).join('<br clear="all" style="page-break-before:always">');
  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>body{font-family:"Times New Roman";font-size:12pt;line-height:1.5}p{margin:0 0 6pt}@page{margin:2.5cm 2cm 2cm 3cm}</style></head><body>${corpo}</body></html>`;
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+html],{type:'application/msword'}));a.download=((lmTitular(d)||'documento')+' LexMandato.doc').replace(/[\\/:*?"<>|]+/g,' ');document.body.appendChild(a);a.click();a.remove()}

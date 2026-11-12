@@ -59,13 +59,17 @@ create table if not exists public.lm_auditoria (
   user_id       uuid references auth.users(id) on delete set null,
   email         text not null default '',
   acao          text not null,
-  detalhe       text not null default '',
+  detalhe       text not null default '',   -- completo, para o escritorio
+  resumo        text not null default '',   -- sem nome de cliente e sem numero de processo
   quando        timestamptz not null default now()
 );
+alter table public.lm_auditoria add column if not exists resumo text not null default '';
 create index if not exists lm_auditoria_esc on public.lm_auditoria (escritorio_id, quando desc);
 create index if not exists lm_auditoria_quando on public.lm_auditoria (quando desc);
 
-create or replace function public.lm_registrar(p_acao text, p_detalhe text default '', p_escritorio uuid default null)
+-- p_detalhe  o que o escritorio enxerga, com nome de cliente e numero de processo
+-- p_resumo   o que o login mestre enxerga, sem identificar ninguem
+create or replace function public.lm_registrar(p_acao text, p_detalhe text default '', p_resumo text default '', p_escritorio uuid default null)
 returns void
 language plpgsql
 security definer
@@ -73,15 +77,17 @@ set search_path = public
 as $$
 begin
   if auth.uid() is null or coalesce(trim(p_acao),'') = '' then return; end if;
-  insert into public.lm_auditoria (escritorio_id, user_id, email, acao, detalhe)
+  insert into public.lm_auditoria (escritorio_id, user_id, email, acao, detalhe, resumo)
        values (p_escritorio,
                auth.uid(),
                coalesce((select email from auth.users where id = auth.uid()),''),
                left(p_acao,60),
-               left(coalesce(p_detalhe,''),300));
+               left(coalesce(p_detalhe,''),300),
+               left(coalesce(nullif(trim(p_resumo),''), ''),120));
 end $$;
 
-grant execute on function public.lm_registrar(text,text,uuid) to authenticated;
+grant execute on function public.lm_registrar(text,text,text,uuid) to authenticated;
+drop function if exists public.lm_registrar(text,text,uuid);
 
 -- Limpeza: a auditoria guarda um ano. Chame de vez em quando, ou deixe para
 -- quando a tabela crescer.
@@ -135,6 +141,9 @@ $$;
 grant execute on function public.bs_conectados() to authenticated;
 
 -- O que aconteceu. Sem escritório informado, traz de todos.
+-- Devolve o resumo, nunca o detalhe: o login mestre precisa saber quem fez o
+-- quê e quando, e não precisa do nome do cliente nem do número do processo
+-- de escritório de terceiro. Dado que não é necessário não se mostra.
 create or replace function public.bs_auditoria(p_escritorio uuid default null, p_dias int default 30, p_limite int default 300)
 returns table (
   quando timestamptz, email text, escritorio text, escritorio_id uuid, acao text, detalhe text
@@ -144,7 +153,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select a.quando, a.email, coalesce(e.nome,''), a.escritorio_id, a.acao, a.detalhe
+  select a.quando, a.email, coalesce(e.nome,''), a.escritorio_id, a.acao, coalesce(a.resumo,'')
     from public.lm_auditoria a
     left join public.lm_escritorios e on e.id = a.escritorio_id
    where public.lm_e_mestre()
@@ -162,11 +171,13 @@ grant execute on function public.bs_auditoria(uuid,int,int) to authenticated;
 
 alter table public.lm_auditoria enable row level security;
 drop policy if exists lm_auditoria_ler on public.lm_auditoria;
+-- Repare que o login mestre NÃO entra nesta política. A leitura direta da
+-- tabela traz o detalhe completo, e isso é do escritório. O login mestre
+-- enxerga pela função bs_auditoria, que devolve só o resumo.
 create policy lm_auditoria_ler on public.lm_auditoria
   for select to authenticated
   using (
-    public.lm_e_mestre()
-    or user_id = auth.uid()
+    user_id = auth.uid()
     or (escritorio_id is not null and escritorio_id in (select public.lm_meus_escritorios()))
   );
 
@@ -188,4 +199,5 @@ grant select on public.lm_auditoria, public.lm_presenca to authenticated;
 -- ---------------------------------------------------------------------------
 -- select * from public.bs_conectados();
 -- select * from public.bs_auditoria(null, 7, 100);
+-- select acao, detalhe, resumo from public.lm_auditoria order by quando desc limit 20;
 -- select acao, count(*) from public.lm_auditoria group by acao order by 2 desc;
