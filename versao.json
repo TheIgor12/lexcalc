@@ -1,4 +1,4 @@
 {
-  "versao": "1.10.3",
-  "novidades": "O envio do papel timbrado passou a avisar quando a imagem é pequena demais para a folha inteira, porque esticada ela sai borrada na impressão. Em PDF isso não acontece."
+  "versao": "1.10.4",
+  "novidades": "Ao enviar o papel timbrado, o sistema mede o próprio arquivo e já deixa certos os espaços de cabeçalho e de rodapé. Ninguém precisa adivinhar centímetro para o texto não encostar na marca nem na faixa do rodapé."
 }

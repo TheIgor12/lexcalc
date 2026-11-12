@@ -215,7 +215,7 @@ const OPT_JUR=`<option value="auto">Juros legais (0,5% até 01/2003, 1% até 08/
 /* ============ Tela ============ */
 function topo(){const it=[['inicio','Início']];if(pode('calc_salvos'))it.push(['meus','Meus cálculos']);if(lmAlgumaAba())it.push(['mandato','LexMandato']);if(verAbaPerfis())it.push(['perfis','Equipe e perfis']);it.push(['assinar','Assinatura'],['config','Configurações'],['ajuda','Ajuda']);
  return `<div class="top"><div class="logo" onclick="ir('inicio')"><img src="assets/icone.png" alt=""><span>Lex <b>Calc</b></span></div><div class="nav">${it.map(([k,t])=>`<button class="${U.view===k?'on':''}" onclick="ir('${k}')">${t}</button>`).join('')}</div><div class="usr"><span class="ver" title="Versão do Lex Calc instalada neste navegador">v${VERSAO_LEX}</span><button class="btn3 atu" id="btnAtu" title="Procurar atualização do sistema" onclick="procurarAtualizacao(this)">${ICO_ATU} Procurar atualização</button><span class="eml">${esc(U.user?U.user.email:'')}</span><button class="btn3" onclick="sair()">Sair</button></div></div>`}
-const VERSAO_LEX='1.10.3';
+const VERSAO_LEX='1.10.4';
 const ICO_ATU='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>';
 async function procurarAtualizacao(btn){if(btn)btn.classList.add('gira');
  try{const r=await fetch('versao.json?t='+Date.now(),{cache:'no-store'});const j=await r.json();const v=String(j.versao||'').replace(/^v/i,'');
@@ -674,6 +674,45 @@ async function planilha(acao,b){const t0=b?b.textContent:'';if(b){b.disabled=tru
   setTimeout(()=>URL.revokeObjectURL(url),120000)}catch(e){toast(e.message||String(e))}finally{if(b){b.disabled=false;b.textContent=t0}}}
 const BOT_PLAN=`<div class="acts noprint"><button class="btn2" onclick="planilha('imprimir',this)">🖨 Imprimir planilha</button><button class="btn" onclick="planilha('baixar',this)">⬇ Baixar planilha em PDF</button></div>`;
 /* Papel timbrado */
+/* Lê a primeira página do timbre e devolve, em centímetros, o espaço a
+   reservar em cima e embaixo, com uma folga para o texto não encostar. */
+async function medirTimbre(f){
+ try{
+  const cv=document.createElement('canvas'),ct=cv.getContext('2d',{willReadFrequently:true});
+  let alturaCm=29.7;
+  if(f.type==='application/pdf'){
+   const pj=await lmCarregarScript('assets/pdfjs.min.js','pdfjsLib');
+   pj.GlobalWorkerOptions.workerSrc='assets/pdfjs.worker.min.js';
+   const doc=await pj.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
+   const pagina=await doc.getPage(1);const vp0=pagina.getViewport({scale:1});
+   alturaCm=vp0.height/28.3465;
+   const escala=Math.min(2,900/vp0.height);const vp=pagina.getViewport({scale:escala});
+   cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
+   ct.fillStyle='#fff';ct.fillRect(0,0,cv.width,cv.height);
+   await pagina.render({canvasContext:ct,viewport:vp}).promise;
+  }else{
+   const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(f)});
+   const escala=Math.min(1,900/img.naturalHeight);
+   cv.width=Math.ceil(img.naturalWidth*escala);cv.height=Math.ceil(img.naturalHeight*escala);
+   ct.fillStyle='#fff';ct.fillRect(0,0,cv.width,cv.height);ct.drawImage(img,0,0,cv.width,cv.height);
+  }
+  const d=ct.getImageData(0,0,cv.width,cv.height).data;
+  const forte=new Array(cv.height).fill(0);
+  for(let y=0;y<cv.height;y++){let n=0;const base=y*cv.width*4;
+   for(let x=0;x<cv.width;x++){const i=base+x*4;
+    const lum=(d[i]*.299+d[i+1]*.587+d[i+2]*.114);
+    if(d[i+3]>20&&lum<150)n++}
+   forte[y]=n/cv.width}
+  const porCm=cv.height/alturaCm;
+  let fimCab=0;const limiteCab=Math.floor(cv.height*0.33);
+  for(let y=0;y<limiteCab;y++)if(forte[y]>0.004)fimCab=y;
+  let inicioRod=cv.height;const comecoRod=Math.floor(cv.height*0.6);
+  for(let y=comecoRod;y<cv.height;y++)if(forte[y]>0.30){inicioRod=y;break}
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const topo=clamp(fimCab?fimCab/porCm+0.6:4,1.5,8);
+  const rodape=clamp(inicioRod<cv.height?(cv.height-inicioRod)/porCm+0.5:3,1.5,8);
+  return {topo:topo.toFixed(1),rodape:rodape.toFixed(1)};
+ }catch(e){return null}}
 async function enviarTimbrado(inp){const f=inp.files&&inp.files[0];if(!f)return;const ok=['application/pdf','image/png','image/jpeg'];if(!ok.includes(f.type)){toast('Envie um arquivo PDF, PNG ou JPG.');inp.value='';return}if(f.size>8*1048576){toast('O arquivo passa de 8 MB. Envie uma versão menor.');inp.value='';return}
  /* Imagem esticada para a folha inteira fica borrada se vier em baixa
     resolução. A4 impresso a 200 pontos por polegada pede cerca de 1654
@@ -682,13 +721,19 @@ async function enviarTimbrado(inp){const f=inp.files&&inp.files[0];if(!f)return;
   const dim=await new Promise(res=>{const i=new Image();i.onload=()=>res({w:i.naturalWidth,h:i.naturalHeight});i.onerror=()=>res(null);i.src=URL.createObjectURL(f)});
   if(dim&&dim.w<larguraMin){
    if(!confirm('A imagem tem '+dim.w+' pixels de largura. Esticada para a folha inteira, ela sai borrada na impress\u00e3o. O ideal \u00e9 enviar o timbre em PDF, que n\u00e3o perde qualidade, ou uma imagem com pelo menos '+larguraMin+' pixels de largura.\n\nEnviar assim mesmo?')){inp.value='';return}}}
+ /* Mede o próprio timbre para descobrir onde o cabeçalho termina e onde a
+    faixa do rodapé começa, e já deixa as margens certas. Quem envia não
+    precisa adivinhar centímetro nenhum. */
+ const margens=await medirTimbre(f);
  const ext={'application/pdf':'pdf','image/png':'png','image/jpeg':'jpg'}[f.type];
  /* Dentro de um escritório, o timbre é do escritório e vale para a equipe toda. */
  const naOrg=temOrg();const path=(naOrg?'esc/'+LM.org.id:U.user.id)+'/timbrado.'+ext;
  toast('Enviando o papel timbrado...');
  const old=timbreDe();if(old&&old.path&&old.path!==path){try{await SB.storage.from('lexcalc').remove([old.path])}catch(e){}}
  const {error}=await SB.storage.from('lexcalc').upload(path,f,{upsert:true,contentType:f.type});if(error){toast('Não foi possível enviar: '+error.message);inp.value='';return}
- const tb={path,tipo:f.type,nome:f.name,topo:(old&&old.topo)||'4',rodape:(old&&old.rodape)||'3'};
+ const tb={path,tipo:f.type,nome:f.name,
+  topo:(margens&&margens.topo)||(old&&old.topo)||'4',
+  rodape:(margens&&margens.rodape)||(old&&old.rodape)||'3'};
  if(naOrg){LM.esc=LM.esc||{};LM.esc.timbrado=tb;LM.org.dados=Object.assign({},LM.org.dados||{},{timbrado:tb});
   if(!(await lmSalvarEsc())){toast('Arquivo enviado, mas não foi possível salvar no escritório.');return}}
  else{const p=Object.assign({},pref(),{timbrado:tb});const {data,error:e2}=await SB.auth.updateUser({data:{lexcalc:p}});if(e2){toast('Arquivo enviado, mas não foi possível salvar: '+e2.message);return}U.user=data.user}toast('Papel timbrado salvo');render()}
