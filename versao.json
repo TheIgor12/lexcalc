@@ -1,4 +1,4 @@
 {
-  "versao": "1.10.1",
-  "novidades": "A planilha de cálculo volta a sair com o papel timbrado quando o escritório ainda não enviou o dele, usando o da sua conta, e passou a oferecer a passagem desse arquivo para o escritório inteiro. A linha de rodapé deixou de encostar na faixa do timbre."
+  "versao": "1.10.2",
+  "novidades": "Correção do título da planilha, que invadia o espaço do papel timbrado porque o texto era desenhado a partir da linha de base. Com timbre do escritório, o título passou a sair em tom escuro neutro, sem brigar com as cores da marca."
 }
