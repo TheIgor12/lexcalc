@@ -1,4 +1,4 @@
 {
-  "versao": "1.10.2",
-  "novidades": "Correção do título da planilha, que invadia o espaço do papel timbrado porque o texto era desenhado a partir da linha de base. Com timbre do escritório, o título passou a sair em tom escuro neutro, sem brigar com as cores da marca."
+  "versao": "1.10.3",
+  "novidades": "O envio do papel timbrado passou a avisar quando a imagem é pequena demais para a folha inteira, porque esticada ela sai borrada na impressão. Em PDF isso não acontece."
 }
