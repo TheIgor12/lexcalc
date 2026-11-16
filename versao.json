@@ -1,4 +1,4 @@
 {
-  "versao": "1.11.0",
-  "novidades": "Administração geral da BlackSolutions no login mestre: quem está com o sistema aberto neste momento, em qual tela, e o registro do que foi feito em cada escritório, com data, hora e quem fez. Cada escritório também enxerga o próprio registro, inclusive as entradas do suporte, nas Configurações."
+  "versao": "1.11.1",
+  "novidades": "Passa a aceitar o CNPJ alfanumérico que a Receita Federal emite desde 31 de julho de 2026. Empresas com esse formato não conseguiam concluir a assinatura. O teste grátis passou de 14 para 7 dias, igual ao BlackFlow, e o sistema deixou de começar liberado antes de conferir a assinatura."
 }

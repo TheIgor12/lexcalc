@@ -481,14 +481,26 @@ function resHTML(r){if(!r)return '';
 
 
 /* ============ Teste grátis e assinatura ============ */
-const ASS={cfg:{preco:'R$ 29,90 por mês',link_pagamento:'https://www.asaas.com/000/c/3d8jtlc6wgzvm3zk',whatsapp:'5547988432859',dias_teste:14},pagoAte:null,ok:true,dias:14};
-function docOk(v){const d=String(v).replace(/\D/g,'');const dv=(b,p)=>{let s=0;for(let i=0;i<b.length;i++)s+=+b[i]*p[i];const r=s%11;return r<2?0:11-r};
- if(d.length===11){if(/^(\d)\1+$/.test(d))return false;const p1=[10,9,8,7,6,5,4,3,2],p2=[11,10,9,8,7,6,5,4,3,2];return dv(d.slice(0,9),p1)==d[9]&&dv(d.slice(0,10),p2)==d[10]}
- if(d.length===14){if(/^(\d)\1+$/.test(d))return false;const p1=[5,4,3,2,9,8,7,6,5,4,3,2],p2=[6,5,4,3,2,9,8,7,6,5,4,3,2];return dv(d.slice(0,12),p1)==d[12]&&dv(d.slice(0,13),p2)==d[13]}return false}
+const ASS={cfg:{preco:'R$ 29,90 por mês',link_pagamento:'https://www.asaas.com/000/c/3d8jtlc6wgzvm3zk',whatsapp:'5547988432859',dias_teste:7},pagoAte:null,ok:false,dias:0};
+function docOk(v){const txt=String(v==null?'':v);
+ const d=txt.replace(/\D/g,'');
+ const dvNum=(b,p)=>{let s=0;for(let i=0;i<b.length;i++)s+=+b[i]*p[i];const r=s%11;return r<2?0:11-r};
+ if(d.length===11){if(/^(\d)\1+$/.test(d))return false;const p1=[10,9,8,7,6,5,4,3,2],p2=[11,10,9,8,7,6,5,4,3,2];return dvNum(d.slice(0,9),p1)==d[9]&&dvNum(d.slice(0,10),p2)==d[10]}
+ /* CNPJ alfanumérico, emitido pela Receita Federal desde 31 de julho de 2026:
+    as doze primeiras posições aceitam letra, as duas últimas continuam sendo
+    algarismos, e cada caractere vale o seu código ASCII menos 48. Os CNPJ
+    antigos, só numéricos, continuam válidos por esta mesma conta. */
+ const a=txt.replace(/[^0-9A-Za-z]/g,'').toUpperCase();
+ if(a.length===14){
+  if(!/^[0-9]{2}$/.test(a.slice(12)))return false;
+  if(/^(.)\1+$/.test(a))return false;
+  const dvAl=(n,p)=>{let s=0;for(let i=0;i<n;i++)s+=(a.charCodeAt(i)-48)*p[i];const r=s%11;return r<2?0:11-r};
+  return dvAl(12,[5,4,3,2,9,8,7,6,5,4,3,2])==+a[12]&&dvAl(13,[6,5,4,3,2,9,8,7,6,5,4,3,2])==+a[13]}
+ return false}
 async function pagar(b){let reg=null;try{const r=await SB.from('lexcalc_asaas').select('customer_id').eq('user_id',U.user.id).maybeSingle();reg=r.data}catch(e){}
  if(reg)return irPagamento({},b);
  const m=modal(`<h2 style="margin-top:0">Dados para a cobrança</h2><p class="sub">O Asaas, que processa o pagamento, exige o nome e o CPF ou CNPJ de quem paga. Você informa só uma vez.</p><div class="f" style="margin:14px 0 10px"><label>Nome completo ou razão social</label><input id="aNome" autocomplete="name"></div><div class="f"><label>CPF ou CNPJ</label><input id="aDoc" inputmode="numeric"></div><div class="acts"><button class="btn2" onclick="this.closest('.modal').remove()">Cancelar</button><button class="btn" id="aIr">Continuar para o pagamento</button></div>`);
- m.querySelector('#aIr').onclick=async e=>{const nome=$('#aNome').value.trim(),doc=$('#aDoc').value;if(nome.length<3){toast('Informe o nome completo ou a razão social.');return}if(!docOk(doc)){toast('CPF ou CNPJ inválido. Confira os números.');return}await irPagamento({nome,cpfCnpj:doc.replace(/\D/g,'')},e.target);m.remove()}}
+ m.querySelector('#aIr').onclick=async e=>{const nome=$('#aNome').value.trim(),doc=$('#aDoc').value;if(nome.length<3){toast('Informe o nome completo ou a razão social.');return}if(!docOk(doc)){toast('CPF ou CNPJ inválido. Confira os números.');return}await irPagamento({nome,cpfCnpj:doc.replace(/[^0-9A-Za-z]/g,'').toUpperCase()},e.target);m.remove()}}
 async function irPagamento(corpo,b){const t0=b?b.textContent:'';if(b){b.disabled=true;b.textContent='Abrindo o pagamento...'}
  try{const {data,error}=await SB.functions.invoke('lexcalc-checkout',{body:corpo});let d=data;if(error){try{d=await error.context.json()}catch(e){d=null}}
   if(d&&d.url){location.href=d.url;return}toast((d&&d.erro)||'Não foi possível abrir o pagamento agora. Tente de novo ou fale conosco no WhatsApp.')}
@@ -496,7 +508,7 @@ async function irPagamento(corpo,b){const t0=b?b.textContent:'';if(b){b.disabled
 async function aguardarPagamento(){toast('Confirmando o pagamento...');for(let i=0;i<20;i++){await checarAssinatura();if(ASS.pagoAte&&ASS.pagoAte>=hoje()){history.replaceState(null,'',location.pathname);toast('Pagamento confirmado. Acesso liberado até '+br(ASS.pagoAte)+'.');render();return}await new Promise(r=>setTimeout(r,6000))}toast('O pagamento ainda está em análise. Assim que for aprovado, o acesso é liberado sozinho.')}
 async function checarAssinatura(){try{const r=await fetch('assinatura.json?t='+Date.now());if(r.ok)Object.assign(ASS.cfg,await r.json())}catch(e){}
  try{const {data}=await SB.from('lexcalc_assinantes').select('pago_ate').eq('user_id',U.user.id).maybeSingle();ASS.pagoAte=data&&data.pago_ate}catch(e){}
- const criado=new Date(U.user.created_at||Date.now());ASS.dias=Math.ceil((+ASS.cfg.dias_teste||14)-(Date.now()-criado)/864e5);
+ const criado=new Date(U.user.created_at||Date.now());ASS.dias=Math.ceil((+ASS.cfg.dias_teste||7)-(Date.now()-criado)/864e5);
  ASS.ok=(ASS.pagoAte&&ASS.pagoAte>=hoje())||ASS.dias>0}
 function faixaAssinatura(){if(ASS.pagoAte&&ASS.pagoAte>=hoje())return '';return `<div class="notice" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">Teste grátis: ${ASS.dias===1?'falta 1 dia':'faltam '+ASS.dias+' dias'}. Depois, ${esc(ASS.cfg.preco)}.<button class="btn" style="margin-left:auto;padding:8px 16px" data-clique="clique:assinar" onclick="ir('assinar')">Assinar agora</button></div>`}
 function vAssinar(){const wa='https://wa.me/'+ASS.cfg.whatsapp+'?text='+encodeURIComponent('Olá! Quero assinar o Lex Calc. Meu e-mail de acesso é '+U.user.email);
