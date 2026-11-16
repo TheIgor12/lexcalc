@@ -234,7 +234,7 @@ function telaPermitida(v){if(v==='meus')return pode('calc_salvos');if(v==='calc'
 function ir(v,extra){U.view=v;if(extra!==undefined)U.calc=extra;render();window.scrollTo(0,0);if(typeof lmPing==='function')lmPing(v)}
 function render(){try{render0()}catch(e){console.error(e);$('#app').innerHTML=`<div style="max-width:560px;margin:60px auto;padding:20px;color:#f3e6d2;font-family:system-ui"><h2>Algo deu errado ao abrir esta tela</h2><p>Recarregue a página. Se continuar, fale com o suporte pelo WhatsApp (47) 98843-2859.</p><button onclick="U.view='inicio';render()" style="padding:10px 16px">Voltar ao início</button></div>`}}
 function render0(){const a=$('#app');if(!U.user){a.innerHTML=telaLogin();return}
- if(!telaPermitida(U.view))U.view='inicio';let V={inicio:vInicio,meus:vMeus,ajuda:vAjuda,calc:vCalc,assinar:vAssinar,config:vConfig,mandato:vMandato,perfis:vPerfis}[U.view]||vInicio;if(!ASS.ok&&U.view!=='config')V=vAssinar;a.innerHTML=topo()+`<div class="bgleao"></div><div class="wrap">${U.view!=='assinar'&&ASS.ok?faixaAssinatura():''}${V()}</div>`;if(U.view==='calc')posCalc();if(U.view==='config')posConfig();if(U.view==='mandato')posMandato()}
+ if(!telaPermitida(U.view))U.view='inicio';let V={inicio:vInicio,meus:vMeus,ajuda:vAjuda,calc:vCalc,assinar:vAssinar,config:vConfig,mandato:vMandato,perfis:vPerfis}[U.view]||vInicio;if(!ASS.ok&&U.view!=='config')V=(ASS.falta&&ASS.falta.length&&ASS.dias>0)?vIdentidade:vAssinar;a.innerHTML=topo()+`<div class="bgleao"></div><div class="wrap">${U.view!=='assinar'&&ASS.ok?faixaAssinatura():''}${V()}</div>`;if(U.view==='calc')posCalc();if(U.view==='config')posConfig();if(U.view==='mandato')posMandato()}
 const ICO_LEX={balanca:'<svg viewBox="0 0 24 24"><path d="M12 3v18M7 21h10M12 6 4 8m8-2 8 2"/><path d="M4 8 1.5 14.5h5zM20 8l-2.5 6.5h5z"/><path d="M1.5 14.5a2.5 2.5 0 0 0 5 0M17.5 14.5a2.5 2.5 0 0 0 5 0"/></svg>',
  martelo:'<svg viewBox="0 0 24 24"><path d="m14.5 3.5 6 6M17.5 2.5l4 4M12 6l6 6M3 21l8.5-8.5M9 15l-6 6"/><path d="m11 8 5 5 2.5-2.5-5-5z"/></svg>',
  porcento:'<svg viewBox="0 0 24 24"><path d="M19 5 5 19"/><circle cx="7.5" cy="7.5" r="3"/><circle cx="16.5" cy="16.5" r="3"/></svg>',
@@ -509,7 +509,39 @@ async function aguardarPagamento(){toast('Confirmando o pagamento...');for(let i
 async function checarAssinatura(){try{const r=await fetch('assinatura.json?t='+Date.now());if(r.ok)Object.assign(ASS.cfg,await r.json())}catch(e){}
  try{const {data}=await SB.from('lexcalc_assinantes').select('pago_ate').eq('user_id',U.user.id).maybeSingle();ASS.pagoAte=data&&data.pago_ate}catch(e){}
  const criado=new Date(U.user.created_at||Date.now());ASS.dias=Math.ceil((+ASS.cfg.dias_teste||7)-(Date.now()-criado)/864e5);
- ASS.ok=(ASS.pagoAte&&ASS.pagoAte>=hoje())||ASS.dias>0}
+ ASS.ok=(ASS.pagoAte&&ASS.pagoAte>=hoje())||ASS.dias>0;
+ /* O servidor tem a palavra final: assinatura, CPF e celular são conferidos no banco */
+ try{const {data,error}=await SB.rpc('lexcalc_situacao');if(!error&&data){ASS.falta=data.falta||[];ASS.ok=!!data.liberado;
+  if(data.pago_ate)ASS.pagoAte=data.pago_ate;if(data.teste_ate)ASS.dias=Math.ceil((new Date(data.teste_ate+'T23:59:59')-Date.now())/864e5)}}catch(e){}}
+/* Confirmação do responsável antes de liberar o teste grátis */
+const IDV={tel:'',enviado:false,ocupado:false};
+function soDig(v){return String(v||'').replace(/\D/g,'')}
+function vIdentidade(){const f=ASS.falta||[];const cpf=f.includes('cpf');
+ const passo=cpf?`<h2 style="margin-top:0">CPF do responsável</h2><p class="sub">O CPF é pedido uma única vez e serve só para garantir um teste grátis por pessoa. Ele não aparece para ninguém da sua equipe.</p>
+  <div class="f" style="margin:14px 0"><label>CPF</label><input id="idCpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00"></div>
+  <div class="acts" style="justify-content:flex-start"><button class="btn" ${IDV.ocupado?'disabled':''} onclick="idSalvarCpf()">Confirmar CPF</button></div>`
+ :`<h2 style="margin-top:0">Confirme o seu celular</h2><p class="sub">Enviamos um código por SMS. Cada celular libera um único teste grátis.</p>
+  <div class="f" style="margin:14px 0"><label>Celular com DDD</label><input id="idTel" inputmode="tel" autocomplete="tel" placeholder="(47) 99999-9999" value="${esc(IDV.tel)}" ${IDV.enviado?'disabled':''}></div>
+  ${IDV.enviado?`<div class="f" style="margin:0 0 14px"><label>Código recebido</label><input id="idCod" inputmode="numeric" autocomplete="one-time-code" maxlength="8"></div>`:''}
+  <div class="acts" style="justify-content:flex-start">${IDV.enviado?`<button class="btn" ${IDV.ocupado?'disabled':''} onclick="idConfirmarCod()">Confirmar código</button><button class="btn2" onclick="IDV.enviado=false;render()">Trocar número</button>`
+   :`<button class="btn" ${IDV.ocupado?'disabled':''} onclick="idEnviarSms()">Enviar código por SMS</button>`}</div>`;
+ return `<h1>Liberar o teste grátis</h1><p class="sub">Faltam ${ASS.dias===1?'1 dia':ASS.dias+' dias'} de teste. Antes de calcular, confirme quem é o responsável pela conta.</p>
+ <div class="panel" style="max-width:620px">${passo}</div>
+ <p class="sub">Prefere não informar? <button class="btn3" onclick="ir('assinar')">Assine agora</button> e o acesso é liberado sem teste.</p>`}
+async function idAtualizar(){IDV.ocupado=false;await checarAssinatura();render()}
+async function idSalvarCpf(){const v=$('#idCpf').value;if(soDig(v).length!==11||!docOk(v)){toast('CPF inválido. Confira os números.');return}
+ IDV.ocupado=true;const {error}=await SB.rpc('lexcalc_registrar_cpf',{p_cpf:soDig(v)});IDV.ocupado=false;
+ if(error){toast(error.message);return}toast('CPF confirmado.');idAtualizar()}
+function telE164(v){let d=soDig(v);if(d.length===10||d.length===11)d='55'+d;return /^55\d{10,11}$/.test(d)?'+'+d:''}
+async function idEnviarSms(){const t=telE164($('#idTel').value);if(!t){toast('Escreva o celular com DDD.');return}
+ IDV.tel=$('#idTel').value;IDV.ocupado=true;render();const {error}=await SB.auth.updateUser({phone:t});IDV.ocupado=false;
+ if(error){toast(/already|registered|exists/i.test(error.message)?'Este celular já está em outra conta.':'Não foi possível enviar o SMS agora. Tente de novo em instantes.');render();return}
+ IDV.enviado=true;toast('Código enviado por SMS.');render()}
+async function idConfirmarCod(){const t=telE164(IDV.tel),token=soDig($('#idCod').value);if(token.length<4){toast('Digite o código recebido.');return}
+ IDV.ocupado=true;const {error}=await SB.auth.verifyOtp({phone:t,token,type:'phone_change'});
+ if(error){IDV.ocupado=false;toast('Código inválido ou vencido.');return}
+ const r=await SB.rpc('bs_registrar_telefone',{p_produto:'lexcalc'});IDV.ocupado=false;
+ if(r.error){toast(r.error.message);return}IDV.enviado=false;toast('Celular confirmado.');idAtualizar()}
 function faixaAssinatura(){if(ASS.pagoAte&&ASS.pagoAte>=hoje())return '';return `<div class="notice" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">Teste grátis: ${ASS.dias===1?'falta 1 dia':'faltam '+ASS.dias+' dias'}. Depois, ${esc(ASS.cfg.preco)}.<button class="btn" style="margin-left:auto;padding:8px 16px" data-clique="clique:assinar" onclick="ir('assinar')">Assinar agora</button></div>`}
 function vAssinar(){const wa='https://wa.me/'+ASS.cfg.whatsapp+'?text='+encodeURIComponent('Olá! Quero assinar o Lex Calc. Meu e-mail de acesso é '+U.user.email);
  return `<h1>Assine o Lex Calc</h1><p class="sub">${ASS.ok?'Garanta o acesso depois do teste grátis.':'O seu teste grátis terminou. Os seus cálculos continuam salvos e voltam a aparecer assim que a assinatura for confirmada.'}</p>

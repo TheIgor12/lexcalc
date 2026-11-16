@@ -1,4 +1,4 @@
 {
-  "versao": "1.11.1",
-  "novidades": "Passa a aceitar o CNPJ alfanumérico que a Receita Federal emite desde 31 de julho de 2026. Empresas com esse formato não conseguiam concluir a assinatura. O teste grátis passou de 14 para 7 dias, igual ao BlackFlow, e o sistema deixou de começar liberado antes de conferir a assinatura."
+  "versao": "1.12.0",
+  "novidades": "O teste grátis passa a pedir o CPF do responsável uma única vez, e o servidor passa a conferir a assinatura antes de gravar cálculos, documentos e timbres. Já está pronta a confirmação do celular por SMS, que entra em vigor quando for ligada."
 }
