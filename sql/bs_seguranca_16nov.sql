@@ -300,39 +300,73 @@ create or replace function public.bs_consultar_cnpj(p_cnpj text)
 returns jsonb
 language plpgsql security definer set search_path to 'public', 'extensions'
 as $function$
+-- Consulta a situação do CNPJ em três fontes públicas, na ordem: CNPJ.ws,
+-- ReceitaWS e BrasilAPI. Nenhuma fonte sozinha decide que o CNPJ não existe:
+-- na prova de 16/11/2026 a BrasilAPI respondeu "não encontrado" para o CNPJ
+-- do Banco do Brasil. Sem resposta conclusiva, volta ok=false, e quem decide
+-- é a criar_clinica conforme bs_config.exigir_cnpj.
 declare
   v text := public.bs_so_alnum(p_cnpj);
   r extensions.http_response;
   j jsonb;
+  v_tent jsonb := '[]'::jsonb;
 begin
   if not public.bs_cnpj_valido(v) then
     return jsonb_build_object('ok', false, 'motivo', 'invalido', 'cnpj', v);
   end if;
+  perform extensions.http_set_curlopt('CURLOPT_TIMEOUT_MS', '5000');
+
+  -- 1. CNPJ.ws
   begin
-    perform extensions.http_set_curlopt('CURLOPT_TIMEOUT_MS', '6000');
-    select * into r from extensions.http_get('https://brasilapi.com.br/api/cnpj/v1/' || v);
+    select * into r from extensions.http_get('https://publica.cnpj.ws/cnpj/' || v);
+    v_tent := v_tent || jsonb_build_object('fonte','cnpj.ws','status',r.status);
+    if r.status = 200 then
+      j := r.content::jsonb;
+      if coalesce(j->'estabelecimento'->>'situacao_cadastral','') <> '' then
+        return jsonb_build_object('ok', true, 'fonte', 'cnpj.ws', 'cnpj', v,
+          'razao', j->>'razao_social',
+          'situacao', upper(j->'estabelecimento'->>'situacao_cadastral'),
+          'consultado_em', now());
+      end if;
+    end if;
   exception when others then
-    return jsonb_build_object('ok', false, 'motivo', 'indisponivel', 'erro', sqlerrm,
-                              'cnpj', v, 'fonte', 'brasilapi', 'consultado_em', now());
+    v_tent := v_tent || jsonb_build_object('fonte','cnpj.ws','erro',sqlerrm);
   end;
 
-  if r.status = 200 then
-    j := r.content::jsonb;
-    return jsonb_build_object('ok', true, 'fonte', 'brasilapi', 'cnpj', v,
-      'razao', j->>'razao_social',
-      'situacao', upper(coalesce(j->>'descricao_situacao_cadastral', '')),
-      'consultado_em', now());
-  elsif r.status = 404 then
-    return jsonb_build_object('ok', true, 'fonte', 'brasilapi', 'cnpj', v,
-      'situacao', 'NAO ENCONTRADO', 'consultado_em', now());
-  elsif v !~ '^[0-9]{14}$' then
-    -- CNPJ alfanumérico, emitido desde 31/07/2026: a consulta pública pode
-    -- ainda não reconhecer o formato.
-    return jsonb_build_object('ok', false, 'motivo', 'formato_novo', 'status', r.status,
-      'cnpj', v, 'fonte', 'brasilapi', 'consultado_em', now());
-  end if;
-  return jsonb_build_object('ok', false, 'motivo', 'indisponivel', 'status', r.status,
-    'cnpj', v, 'fonte', 'brasilapi', 'consultado_em', now());
+  -- 2. ReceitaWS
+  begin
+    select * into r from extensions.http_get('https://receitaws.com.br/v1/cnpj/' || v);
+    v_tent := v_tent || jsonb_build_object('fonte','receitaws','status',r.status);
+    if r.status = 200 then
+      j := r.content::jsonb;
+      if coalesce(j->>'status','') <> 'ERROR' and coalesce(j->>'situacao','') <> '' then
+        return jsonb_build_object('ok', true, 'fonte', 'receitaws', 'cnpj', v,
+          'razao', j->>'nome', 'situacao', upper(j->>'situacao'), 'consultado_em', now());
+      end if;
+    end if;
+  exception when others then
+    v_tent := v_tent || jsonb_build_object('fonte','receitaws','erro',sqlerrm);
+  end;
+
+  -- 3. BrasilAPI
+  begin
+    select * into r from extensions.http_get('https://brasilapi.com.br/api/cnpj/v1/' || v);
+    v_tent := v_tent || jsonb_build_object('fonte','brasilapi','status',r.status);
+    if r.status = 200 then
+      j := r.content::jsonb;
+      if coalesce(j->>'descricao_situacao_cadastral','') <> '' then
+        return jsonb_build_object('ok', true, 'fonte', 'brasilapi', 'cnpj', v,
+          'razao', j->>'razao_social',
+          'situacao', upper(j->>'descricao_situacao_cadastral'), 'consultado_em', now());
+      end if;
+    end if;
+  exception when others then
+    v_tent := v_tent || jsonb_build_object('fonte','brasilapi','erro',sqlerrm);
+  end;
+
+  return jsonb_build_object('ok', false,
+    'motivo', case when v ~ '^[0-9]{14}$' then 'indisponivel' else 'formato_novo' end,
+    'cnpj', v, 'tentativas', v_tent, 'consultado_em', now());
 end
 $function$;
 -- Ninguém chama de fora: só a criar_clinica, que roda como dona da função.
